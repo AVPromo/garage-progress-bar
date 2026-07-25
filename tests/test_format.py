@@ -5,9 +5,10 @@ from wgmod_research.adapter import format as f
 
 
 class _KPI(object):
-    def __init__(self, value=None, type=""):
+    def __init__(self, value=None, type="", name=""):
         self.value = value
         self.type = type
+        self.name = name
 
 
 class _Desc(object):
@@ -193,6 +194,88 @@ def test_skilltree_value_none_usable_is_empty():
     assert f.skilltree_value(a) == ""
 
 
+# --- fill_kpi_placeholders (indexed description templates) --------------------
+
+# The tier-XI French TD's final node ("Modified Output Limiter"): TWO KPIs, so its
+# localized template indexes its slots -- {value0}/{value1} rendered raw before the
+# indexed path existed (and the miss also appended bare-number KPI lines).
+_INDEXED_TMPL = (u"Increases the post-limit damage spike by "
+                 u"{colorTagOpen}{value0} HP{colorTagClose} and the maximum "
+                 u"post-limit damage bonus by {colorTagOpen}{value1}%{colorTagClose}.")
+
+
+def test_fill_kpi_placeholders_indexed_slots():
+    a = _Action([_KPI(value=20.0, type="add", name="value"),
+                 _KPI(value=1.05, type="mul", name="value")])
+    text, filled = f.fill_kpi_placeholders(_INDEXED_TMPL, a)
+    assert filled is True
+    assert u"{value0}" not in text and u"{value1}" not in text
+    assert u"spike by {colorTagOpen}20 HP{colorTagClose}" in text
+    assert u"bonus by {colorTagOpen}5%{colorTagClose}" in text   # colour tags untouched
+
+
+def test_fill_kpi_placeholders_single_kpi_omits_the_index():
+    # one KPI -> the client spells the slot without an index (the plain {value} the
+    # 75 working templates use); regression guard for that path.
+    a = _Action([_KPI(value=1.2, type="mul", name="value")])
+    text, filled = f.fill_kpi_placeholders(u"Reduces reload by {value}%.", a)
+    assert (text, filled) == (u"Reduces reload by 20%.", True)
+
+
+def test_fill_kpi_placeholders_leaves_plain_value_alone_for_multi_kpi():
+    # a plain {value} template on a multi-KPI node is NOT ours to fill (the slots
+    # would be indexed) -- leave it to the legacy skilltree_value path.
+    a = _Action([_KPI(value=1.2, type="mul", name="value"),
+                 _KPI(value=3.0, type="add", name="value")])
+    tmpl = u"Reduces reload by {value}%."
+    assert f.fill_kpi_placeholders(tmpl, a) == (tmpl, False)
+
+
+def test_fill_kpi_placeholders_unmatched_or_unusable_is_untouched():
+    tmpl = u"Reduces reload by {value0}%."
+    # no KPI list / no name / non-numeric value / a name the template doesn't use
+    assert f.fill_kpi_placeholders(tmpl, _Action([])) == (tmpl, False)
+    assert f.fill_kpi_placeholders(tmpl, _Action([_KPI(value=1.2, type="mul")])) == (
+        tmpl, False)
+    assert f.fill_kpi_placeholders(
+        tmpl, _Action([_KPI(value="x", name="value"), _KPI(value=None, name="value")])
+    ) == (tmpl, False)
+    assert f.fill_kpi_placeholders(
+        tmpl, _Action([_KPI(value=1.2, type="mul", name="other"),
+                       _KPI(value=1.2, type="mul", name="other")])) == (tmpl, False)
+
+
+def test_mark_color_tags_wraps_the_whole_highlighted_run():
+    # WG highlights the figure AND its unit ("{value0} HP") -- the sentinels must span
+    # the whole wrapped run, not just the digits, and every pair in the sentence.
+    a = _Action([_KPI(value=20.0, type="add", name="value"),
+                 _KPI(value=1.05, type="mul", name="value")])
+    text, _ = f.fill_kpi_placeholders(_INDEXED_TMPL, a)
+    out = f.mark_color_tags(text)
+    assert u"spike by " + f.HL_OPEN + u"20 HP" + f.HL_CLOSE in out
+    assert u"bonus by " + f.HL_OPEN + u"5%" + f.HL_CLOSE in out
+    assert u"colorTag" not in out
+
+
+def test_mark_color_tags_unbalanced_degrades_to_plain_text():
+    # an unclosed / orphaned / empty-input tag must never leak a sentinel char or a
+    # half-open span into the widget
+    for tmpl in (u"Reduces reload by {colorTagOpen}20%.",
+                 u"Reduces reload by 20%{colorTagClose}.",
+                 u"{colorTagClose}20%{colorTagOpen}"):
+        out = f.mark_color_tags(tmpl)
+        assert u"colorTag" not in out
+        assert f.HL_OPEN not in out and f.HL_CLOSE not in out
+    assert f.mark_color_tags(None) == u""
+
+
+def test_kpi_magnitude_is_unsigned_and_unitless():
+    assert f.kpi_magnitude(_KPI(value=1.05, type="mul")) == "5"
+    assert f.kpi_magnitude(_KPI(value=0.75, type="mul")) == "25"   # unsigned
+    assert f.kpi_magnitude(_KPI(value=-20.0, type="add")) == "20"
+    assert f.kpi_magnitude(_KPI(value=None)) == ""
+
+
 # --- enriched buff-line records ---------------------------------------------
 
 def test_param_icon_name_remaps_known_kpi():
@@ -235,6 +318,21 @@ def test_kpi_record_coerces_missing_fields_to_empty():
     sep = f.KPI_FIELD_SEP
     assert f.kpi_record("", False, "+25%", "") == sep.join(["", "pos", "+25%", ""])
     assert f.kpi_record(None, True, None, None) == sep.join(["", "neg", "", ""])
+
+
+def test_degenerate_kpi_records_are_dropped_from_appended_lines():
+    # the naked-number bug: a 'mechanic' node's generic 'value' KPI resolves to no
+    # vehParams icon AND no phrase, so its record is a bare green figure. The append
+    # site in _skilltree_effect filters on this predicate; a record with an icon OR a
+    # phrase survives, and a plain (non-record) line is left alone.
+    naked = f.kpi_record("", False, "+20", "")
+    by_desc = f.kpi_record("", False, "-5%", "to reload time")
+    by_icon = f.kpi_record("img://x.png", False, "+3", "")
+    assert f.kpi_record_labeled(naked) is False
+    kept = [r for r in (naked, by_desc, by_icon) if f.kpi_record_labeled(r)]
+    assert kept == [by_desc, by_icon]
+    assert f.kpi_record_labeled(u"a plain sentence") is True
+    assert f.kpi_record_labeled("") is False
 
 
 # --- resolve_is_debuff ------------------------------------------------------

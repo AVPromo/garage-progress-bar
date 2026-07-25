@@ -512,11 +512,67 @@ function creditsHtml(price) {
 // tertiary row. All fields are escaped; the icon URL is only ever a background and
 // is gated on the img:// prefix (same guard as tickIconHtml).
 const BUFF_SEP = "\x1f";
+// A skill-tree description sentence carries WG's own {colorTagOpen}...{colorTagClose}
+// highlight (the figure, sometimes figure + unit) as these sentinel control chars --
+// Python's format.HL_OPEN/HL_CLOSE, swapped in there because raw HTML from the model
+// would not (and must not) survive escaping. So escape FIRST, then turn the sentinels
+// into the span; a stray/unpaired sentinel is dropped rather than leaked.
+const HL_OPEN = "\x02", HL_CLOSE = "\x03";
+const HL_PAIR_RE = new RegExp(HL_OPEN + "([^" + HL_OPEN + HL_CLOSE + "]*)" + HL_CLOSE, "g");
+const HL_STRAY_RE = new RegExp("[" + HL_OPEN + HL_CLOSE + "]", "g");
+// A word plus the whitespace that follows it -- the tokenization unit below.
+const HL_TOKEN_RE = /\S+\s*/g;
+// ONE SPAN PER WORD, not one span per run. .wg-tip-effect is a wrapping flex row, and
+// every flex item is block-level: an item can never share a line with the item beside
+// it, so with one item per RUN the highlight span was pushed onto its own flex line
+// whenever the preceding sentence text happened to fill the row -- hence "wraps
+// sometimes". Per-word items make flex line-breaking BE word wrapping, so the
+// highlighted words sit inline with their neighbours. (`display:inline` on the span
+// does NOT fix the underlying blockify in Coherent -- see the CSS; don't retry it.)
+// Each token carries its own trailing space inside the span (the row is
+// white-space:pre-wrap), rather than a column-gap: the original spacing then renders
+// literally instead of being re-invented as an em fudge that drifts per font size.
+function escapeHl(s) {
+    const raw = String(s == null ? "" : s);
+    // No highlight in this line -> plain escaped text, exactly as before (keeps the
+    // non-flex .wg-tip-variant-eff rows, which never carry sentinels, untouched).
+    if (raw.indexOf(HL_OPEN) < 0) return escapeHtml(raw.replace(HL_STRAY_RE, ""));
+    // Flag every char that sits inside a BALANCED sentinel pair. Strays are dropped as
+    // they are copied, so a malformed template degrades to plain text and can never leak
+    // a control char or a half-open span.
+    let text = "", m, at = 0;
+    const hl = [];
+    const take = function (chunk, on) {
+        text += chunk.replace(HL_STRAY_RE, "");
+        while (hl.length < text.length) hl.push(on);
+    };
+    HL_PAIR_RE.lastIndex = 0;
+    while ((m = HL_PAIR_RE.exec(raw)) !== null) {
+        take(raw.slice(at, m.index), false);
+        take(m[1], true);
+        at = m.index + m[0].length;
+    }
+    take(raw.slice(at), false);
+    // ponytail: whole-token highlight granularity -- a pair ending mid-token
+    // ("({value0}%)" -> "+15%)") colors the adjacent bracket too, because nesting a span
+    // inside a token span would just get blockified again. Visually harmless (one char
+    // more parchment than WG paints). Upgrade path if it ever reads wrong: emit the
+    // sub-runs inside the token span and make the TOKEN the flex item.
+    let out = "";
+    HL_TOKEN_RE.lastIndex = 0;
+    while ((m = HL_TOKEN_RE.exec(text)) !== null) {
+        let on = false;
+        for (let i = m.index; i < m.index + m[0].length && !on; i++) on = hl[i];
+        out += '<span class="' + (on ? "wg-tip-hl" : "wg-tip-tok") + '">' +
+            escapeHtml(m[0]) + "</span>";
+    }
+    return out;    // empty line -> "" (no empty span)
+}
 function buffLineHtml(line, baseCls) {
     baseCls = baseCls || "wg-tip-effect";
     const f = (line || "").split(BUFF_SEP);
     if (f.length < 4) {
-        return '<div class="' + baseCls + '">' + escapeHtml(line) + "</div>";
+        return '<div class="' + baseCls + '">' + escapeHl(line) + "</div>";
     }
     const icon = f[0], cls = f[1], value = f[2], desc = f[3];
     let h = '<div class="' + baseCls + ' wg-tip-buff">';

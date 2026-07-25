@@ -17,7 +17,10 @@ from wgmod_research.adapter import i18n
 from wgmod_research.adapter._read_common import _kpi_number_lines
 from wgmod_research.adapter.format import (
     skilltree_icon as _skilltree_icon, humanize as _humanize,
-    skilltree_value as _skilltree_value)
+    skilltree_value as _skilltree_value,
+    fill_kpi_placeholders as _fill_kpi_placeholders,
+    kpi_record_labeled as _kpi_record_labeled,
+    mark_color_tags as _mark_color_tags)
 from wgmod_research.domain import types as t
 
 
@@ -183,8 +186,12 @@ def _skilltree_effect(action):
     Signature 'mechanic' perks (major/final) describe themselves in a localized
     SENTENCE template keyed by image name:
     R.strings.veh_skill_tree.tooltips.description.dyn(<imageName>), e.g. "Reduces gun
-    reload time by {value}% in Pillbox mode." We fill {value} with the node's KPI
-    magnitude (_skilltree_value) and strip the {colorTagOpen/Close} markup.
+    reload time by {value}% in Pillbox mode." A multi-KPI node INDEXES its slots
+    instead ('{value0}', '{value1}' -- the tier-XI French TD final node); both
+    spellings are filled from the node's KPI magnitudes (_fill_kpi_placeholders,
+    _skilltree_value); the {colorTagOpen/Close} pair around the highlighted run becomes
+    the widget's highlight sentinels (format.mark_color_tags), so the run renders in
+    WG's own bright parchment like the native perk tooltip.
 
     Most nodes' templates are QUALITATIVE with no magnitude slot (e.g. "Reduces gun
     dispersion when your gun is damaged.") -- the number lives only in the KPI. For
@@ -201,18 +208,21 @@ def _skilltree_effect(action):
         if image_name:
             rid = R.strings.veh_skill_tree.tooltips.description.dyn(image_name)
             tmpl = backport.text(rid() if callable(rid) else rid) or ""
-        kpi_lines = "\n".join(_kpi_number_lines(action))
+        # A record with neither an icon nor a phrase is a naked coloured figure with
+        # nothing to name it (a 'mechanic' node's generic 'value' KPI) -- never a line.
+        kpi_lines = "\n".join(r for r in _kpi_number_lines(action)
+                              if _kpi_record_labeled(r))
         if not tmpl or tmpl.startswith("#"):
             return kpi_lines  # no sentence template -> KPI-derived line(s) only
         value = _skilltree_value(action)
-        filled = (tmpl.replace("{value}", value)
-                      .replace("{colorTagOpen}", "")
-                      .replace("{colorTagClose}", "").strip())
-        if "{value}" in tmpl:
-            # Template embeds its own magnitude slot (signature 'mechanic' perks).
-            # If we couldn't classify the KPI (defensive, not seen on EU 2.3), prefer
-            # the KPI-derived line so a numberless "by %" doesn't reach the tooltip.
-            return filled if value else (kpi_lines or filled)
+        text, subbed = _fill_kpi_placeholders(tmpl, action)
+        filled = _mark_color_tags(text.replace("{value}", value)).strip()
+        if subbed or "{value}" in tmpl:
+            # Template embeds its own magnitude slot(s) (signature 'mechanic' perks):
+            # the sentence already carries the numbers, so the KPI lines are NOT
+            # appended. If nothing filled (defensive, not seen on EU 2.3), prefer the
+            # KPI-derived line so a numberless "by %" doesn't reach the tooltip.
+            return filled if (subbed or value) else (kpi_lines or filled)
         # Qualitative sentence, no magnitude slot: append the KPI's signed number(s).
         return (filled + "\n" + kpi_lines) if (filled and kpi_lines) else (filled or kpi_lines)
     except Exception:

@@ -139,24 +139,65 @@ def kpi_prefix(k):
     return fmt_signed(val)
 
 
+def kpi_magnitude(k):
+    """The bare magnitude of ONE KPI for a description template's value slot:
+    'mul' -> percent (|value-1|*100), anything else -> the raw |value| (the realistic
+    non-'mul' shape is 'add'). Unsigned and unit-less -- the template's own wording
+    carries the direction and the unit. "" when the value is missing or non-numeric
+    (bool excluded up front, it's an int subclass)."""
+    v = getattr(k, "value", None)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return ""
+    v = float(v)
+    if (getattr(k, "type", "") or "") == "mul":
+        return fmt_num(abs((v - 1.0) * 100.0))
+    return fmt_num(abs(v))
+
+
 def skilltree_value(action):
-    """The bare {value} magnitude for a tier-XI sentence template, scanned from the
-    node's KPI objects: 'mul' -> percent (|value-1|*100), 'add' -> raw magnitude.
-    "" when no KPI carries a usable number. Unsigned -- the template's own wording
-    carries the direction (e.g. 'Reduces ... by {value}%'). Verified live (EU 2.3):
-    the signature 'mechanic' perks' generic 'value' KPI is itself typed 'mul'/'add',
-    so it fills here; an unclassifiable type leaves "" for the caller to fall back."""
+    """The bare {value} magnitude for a tier-XI sentence template: the first of the
+    node's KPI objects that carries a usable number (see kpi_magnitude). "" when none
+    does. Verified live (EU 2.3): the signature 'mechanic' perks' generic 'value' KPI
+    is itself typed 'mul'/'add', so it fills here."""
     for k in kpi_objs(action):
-        v = getattr(k, "value", None)
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
-            continue
-        v = float(v)
-        ktype = getattr(k, "type", "") or ""
-        if ktype == "mul":
-            return fmt_num(abs((v - 1.0) * 100.0))
-        if ktype == "add":
-            return fmt_num(abs(v))
+        mag = kpi_magnitude(k)
+        if mag:
+            return mag
     return ""
+
+
+def fill_kpi_placeholders(tmpl, action):
+    """Substitute a tier-XI description template's NAMED value placeholders from the
+    node's KPI list; returns (text, filled).
+
+    The client's own perk-tooltip bundle keys each slot by the KPI's `name` plus its
+    0-based position in the ordered kpi list, with the index OMITTED when the node has
+    exactly one KPI -- so a single-KPI node reads '{value}' (the plain path
+    skilltree_value already fills) while a multi-KPI node reads '{value0}', '{value1}'
+    (e.g. the tier-XI French TD final node, whose two slots rendered raw before this).
+    Each slot takes that KPI's unsigned magnitude. Both spellings are accepted for a
+    single-KPI node so a stray index can't leak a raw placeholder either.
+
+    `filled` is True when at least one slot was substituted -- it tells the caller the
+    sentence already carries its own numbers (so the KPI lines must NOT be appended).
+    A slot with no matching KPI, or a KPI with no usable number, is left untouched.
+    Pure (getattr-only, so a duck-typed stub tests it)."""
+    kpis = kpi_objs(action)
+    text = tmpl
+    filled = False
+    for i, k in enumerate(kpis):
+        name = getattr(k, "name", "") or ""
+        mag = kpi_magnitude(k) if name else ""
+        if not mag:
+            continue
+        slots = ["{%s%d}" % (name, i)]
+        if len(kpis) == 1:
+            slots.append("{%s}" % name)
+        for slot in slots:
+            if slot in text:
+                text = text.replace(slot, mag)
+                filled = True
+    return text, filled
 
 
 # --- Enriched buff-line records (icon + color + unit) -----------------------
@@ -171,6 +212,30 @@ def skilltree_value(action):
 # this exact shape; a line WITHOUT the separator is rendered as plain text
 # (back-compat for any non-KPI body line).
 KPI_FIELD_SEP = u"\x1f"
+
+# WG's description templates wrap their HIGHLIGHTED run -- the figure, sometimes
+# figure + unit ("{colorTagOpen}{value0} HP{colorTagClose}") -- in a colour-tag pair
+# that the native perk tooltip renders as a span coloured #ede6d9 (its
+# tagColors = {colorTag: "#ede6d9"}). The widget HTML-escapes a body line, so raw
+# markup from here can't (and must not) survive: the pair is swapped for these
+# sentinel control chars and the JS turns them into the span AFTER escaping (mirrored
+# as HL_OPEN/HL_CLOSE in WGModResearch.js). STX/ETX, like KPI_FIELD_SEP, never appear
+# in localized text and can't collide with the "\x1f" field / "\t" variant / "\n"
+# line separators.
+HL_OPEN = u"\x02"
+HL_CLOSE = u"\x03"
+
+_COLOR_TAG_RE = re.compile(r"\{colorTagOpen\}(.*?)\{colorTagClose\}", re.S)
+
+
+def mark_color_tags(text):
+    """Swap each balanced {colorTagOpen}...{colorTagClose} pair for the HL_OPEN/HL_CLOSE
+    sentinels the widget renders as a highlighted span (the whole wrapped run, which may
+    be number + unit, not just the digits). An unclosed / unpaired tag degrades to plain
+    text -- the leftover marker is dropped, so a malformed template can never leak a
+    sentinel char or a half-open span into the DOM."""
+    out = _COLOR_TAG_RE.sub(HL_OPEN + u"\\1" + HL_CLOSE, text or u"")
+    return out.replace(u"{colorTagOpen}", u"").replace(u"{colorTagClose}", u"")
 
 
 # KPI name -> vehParams param file name (the icon basename AND the key the game's
@@ -259,3 +324,17 @@ def kpi_record(icon, is_debuff, value_str, desc):
     cls = "neg" if is_debuff else "pos"
     return KPI_FIELD_SEP.join(
         [icon or "", cls, value_str or "", desc or ""])
+
+
+def kpi_record_labeled(record):
+    """True when a packed KPI record carries something that NAMES its number -- an
+    icon or a description phrase. A record with neither renders as a bare coloured
+    figure ("+20") with nothing to identify it: that is what a signature 'mechanic'
+    node's generic 'value' KPI degrades to (no vehParams icon, no phrase), and WG's
+    own client never lists KPI rows for those nodes. Callers must drop such records
+    rather than append them as standalone lines. A line WITHOUT the separator is not
+    a record but plain text -> kept."""
+    parts = (record or "").split(KPI_FIELD_SEP)
+    if len(parts) != 4:
+        return bool(record)
+    return bool(parts[0] or parts[3])

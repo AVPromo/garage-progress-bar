@@ -1210,14 +1210,34 @@
 }
 /* Effect/bonus line ("+1% to concealment") -- WG's tooltip description body:
    tertiary parchment, normal weight, wrapping. Sits between the title and the XP
-   cost, mirroring the native parameter rows. One row per KPI. */
+   cost, mirroring the native parameter rows. One row per KPI.
+   WRAPPING FLEX ROW (WG's own FormatText recipe, mono/vehicle_hub/lib/lib.css): a bare
+   inline span inside a plain block gets BLOCKIFIED by Coherent (see .wg-tip-buff below),
+   which broke the line before AND after the .wg-tip-hl highlight run. A flex row alone
+   is NOT enough though -- every flex item is block-level, so one item per text RUN still
+   pushed the highlight onto its own flex line whenever the preceding run filled the row
+   (the "wraps sometimes" report). So a highlighted line is emitted as ONE SPAN PER WORD
+   (escapeHl), making flex line-breaking be word wrapping; `pre-wrap` renders the trailing
+   space each token span carries, which is what keeps the words apart. */
 #wgmod-root .wg-tip-effect {
+    display: flex;
+    flex-wrap: wrap;
+    white-space: pre-wrap;
     margin-top: 5rem;
     font-size: 15rem;
     font-weight: 400;
     color: #8e867d;
     line-height: 1.25;
 }
+/* The highlighted run inside a description sentence ({colorTagOpen}...{colorTagClose}
+   in WG's template -- the figure, sometimes figure + unit): primary parchment, exactly
+   the tagColors #ede6d9 the native perk tooltip paints it with. COLOR ONLY, so it
+   inherits the body row's size/weight and needs NO .wg-large restatement. */
+#wgmod-root .wg-tip-hl {
+    color: #ede6d9;
+}
+/* The non-highlighted word spans of such a line (.wg-tip-tok) get NO rule on purpose:
+   they exist only to be per-word flex items and inherit everything from the row. */
 /* An enriched buff row: the game's own parameter icon, the signed value+unit
    colored green (buff) / red (nerf), then the dim stat phrase -- matching the
    native perk tooltip's buff rows, sized to our 12rem body font. Laid out with
@@ -1229,6 +1249,12 @@
 #wgmod-root .wg-tip-buff {
     display: flex;
     align-items: baseline;
+    /* A buff row carries BOTH classes, so it would otherwise inherit the wrapping /
+       pre-wrap the .wg-tip-effect description row needs: `wrap` would drop the phrase
+       under the value, and `pre-wrap` would turn the markup's separating space into a
+       real flex item. Restated here so buff rows lay out exactly as before. */
+    flex-wrap: nowrap;
+    white-space: normal;
 }
 #wgmod-root .wg-tip-buff-ico {
     flex: 0 0 auto;
