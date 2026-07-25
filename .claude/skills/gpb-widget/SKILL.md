@@ -187,6 +187,44 @@ to keep icon + value + phrase on one line (icon `flex:0 0 auto`; `.wg-tip-buff-d
 `.wg-tip-variant-eff` `margin-top` (every line, incl. the first, carries it). The Python side
 that builds the record is `adapter/_read_common._kpi_lines` (see gpb-architecture).
 
+### Getting WG `{tag}` markup through as styled HTML — the sentinel handoff
+The general recipe (control chars, not markup): **Python replaces the markup with sentinel
+control chars, JS substitutes them into spans AFTER escaping.** Never before escaping — the
+model text is game-supplied, so injecting spans first and escaping second is an injection hole,
+and escaping first then re-writing raw markup can't work because the escaper eats it. Live case:
+`{colorTagOpen}…{colorTagClose}` (the highlighted figure, sometimes figure + unit) →
+`format.mark_color_tags` → `HL_OPEN`/`HL_CLOSE` → JS `escapeHl()` (~535) emits
+`.wg-tip-hl` / `.wg-tip-tok` spans; unpaired/stray sentinels are DROPPED so a malformed template
+degrades to plain text instead of leaking a control char or a half-open span.
+**Claimed control chars — pick a fresh one for any new markup:** `\x1f` (buff-record field sep),
+`\t` (variant sep), `\n` (line sep), `\x02`/`\x03` (`HL_OPEN`/`HL_CLOSE`).
+
+### Coherent inline flow is unusable — the per-word flex recipe
+This supersedes/extends the "Coherent stacks bare inline spans" note above and in
+`WGModResearch.css`, which stops one level too early. Full picture, in the order it bites:
+1. A bare span carrying only `color` gets **blockified** — line breaks BEFORE and AFTER it.
+2. `display:inline` does **not** rescue it. Don't retry.
+3. A wrapping flex row on the CONTAINER is **also not enough**: every flex item is block-level,
+   so nothing can sit beside a text item's LAST line. With one item per RUN the highlight is
+   pushed to its own line exactly when the preceding text happens to fill the row — which
+   presents as the maddening "sometimes it wraps, sometimes it doesn't".
+4. **The working recipe: one flex item per WORD**, each token keeping its own trailing space
+   INSIDE its span, with `white-space: pre-wrap` on the container (`.wg-tip-effect`:
+   `display:flex; flex-wrap:wrap; white-space:pre-wrap`; tokenizer `HL_TOKEN_RE = /\S+\s*/g`).
+   Per-word items make flex line-breaking *be* word wrapping. Do NOT substitute a `column-gap`
+   em fudge for the in-span space — it drifts between Default and Large scale.
+Supporting evidence worth keeping: across all **514** production `_dist` CSS files the client
+uses `display:inline-block` **0** times, `inline-flex` **0** times, `display:inline` **3** times —
+and WG's own mid-sentence-highlight component (`FormatText`, `mono/vehicle_hub/lib/lib.css`) is
+itself a `display:flex; flex-wrap:wrap; white-space:pre-wrap` row. This is the house pattern.
+**Corollary — a shared base class must RESTATE `flex-wrap`/`white-space` on its flex-row
+variants.** A buff row carries both `.wg-tip-effect` and `.wg-tip-buff`, so it inherited the
+description row's wrapping: `.wg-tip-buff` needs explicit `flex-wrap:nowrap; white-space:normal`,
+or `wrap` drops the phrase under the value and `pre-wrap` turns the literal space emitted between
+the value and desc spans into a visible extra gap.
+*(Propagate the two blocks above to the harness `wotmod-gameface-widget` CSS-gotchas list — they
+are generic Coherent behaviour, not mod-specific. Not edited here.)*
+
 ## Done markers
 A tick/chip with `t.done`/`u.done` renders the green-check treatment (`wg-done`, `doneGlyph()` /
 `doneBadge()`). Done ticks ride the bar's LEFT EDGE (`leftPct=0`). Tooltip shows a credits price

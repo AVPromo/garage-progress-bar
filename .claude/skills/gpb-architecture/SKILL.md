@@ -137,6 +137,37 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
     membership booleans against the game set (fail-soft — falls back to raw `KPI.isDebuff` if the
     import fails) and defers to the pure helper, which then feeds `format.kpi_record`
     (`neg`=red / `pos`=green).
+  - **Tier-XI description templates INDEX their value slots: `{<kpi.name><0-based index>}`, with
+    the index OMITTED when the node has exactly ONE KPI.** So a single-KPI node reads `{value}`
+    while a multi-KPI node reads `{value0}`/`{value1}` — a plain `{value}`-only substitution leaves
+    the indexed spellings as raw literal text in the tooltip (the symptom on the tier-XI French TD
+    Fauteur's final node). The substituted text is **magnitude only** — unsigned, no unit:
+    `abs(100*(v-1))` for `kpi.type == "mul"`, else `abs(v)`, trailing zeros dropped
+    (`format.kpi_magnitude`; the loop that walks the ordered KPI list and accepts both spellings is
+    `format.fill_kpi_placeholders`, whose `filled` return tells `_skilltree_effect` the sentence
+    already carries its numbers so the KPI lines must NOT also be appended). Source of truth for
+    the index+magnitude rule is the LIVE client's
+    `mono/vehicle_hub/views/tooltips/perk_tooltip/.../bundle.js` `descriptionValues` transform —
+    it is NOT in the decompiled Python, so don't look for it there. Only 3 templates in
+    `res/text/lc_messages/veh_skill_tree.mo` are indexed at all: `f143_mechanic_0` (2 values),
+    `f143_mechanic_3` (2 — Fauteur's final node, the confirmed case), `r230_mechanic_3` (3, still
+    unverified in-game).
+  - **A KPI record with neither an icon nor a desc must never become a tooltip line.** It renders
+    as a naked green number with nothing naming it. These arise when `kpi.name == "value"` (the
+    generic mechanic-perk KPI), for which `format._param_icon`/`param_icon_name` correctly resolves
+    to `""` — the resolution isn't broken, the record is just unlabelable. `format.kpi_record_labeled`
+    is the predicate; `skill_tree_read._skilltree_effect:213` filters `_kpi_number_lines` through it.
+  - **WG suppresses a skill-tree node's ENTIRE KPI/param list purely on `categories[0] ==
+    "mechanics"`** — same bundle: `[Common,Major,Final].includes(type) && category !== "mechanics"`.
+    Our own read already has `getCategories()` in hand at `skill_tree_read.py:153`, so matching WG
+    is a category test, not new plumbing. Note branching on `getType() == "final"` alone would MISS
+    the mechanic *major* nodes.
+  - **Caveat: `action._descriptor.kpi` (what the mod reads) can diverge from `action.getKpi(vehicle)`
+    (what WG uses)** when a KPI carries `vehicleTypes` or is `AGGREGATE_MUL` — WG's accessor filters
+    and aggregates. The mod reads the descriptor deliberately: base `getKpi` returns `[]` while the
+    node is unpurchased, which is exactly when we need the numbers. Since the indexed slots key off
+    LIST ORDER, a divergence would mis-assign values; order was confirmed correct for
+    `f143_mechanic_3` against the live in-game tooltip.
   - Widget rendering: see gpb-widget "Buff lines".
 - **Progress readout scalars (`progress_current` / `progress_required`) are per-mode; the two
   elite axes differ from each other.** Every emitted `ResearchProgressModel` carries two
