@@ -234,11 +234,22 @@ chip fires `CMD.OPEN_SKILL_TREE`.
 
 ## Header mode switch (`.wg-switch`)
 When a vehicle qualifies for ≥2 bar modes, Python pushes the ordered `availModes` (comma-joined);
-the widget shows the NEXT mode's title dimmed beside the current heading, click swaps the bar to it
-(`selectMode`, persisted per-vehicle), and the previously-active title becomes the new switch
-(A↔B with 2 modes, forward-cycle with 3+). `modeTitle(mode)`, `switchHit(el,x,y)` (live-rect hit-test),
+the widget shows an ALTERNATIVE mode's title dimmed beside the current heading, click swaps the bar
+to it (`selectMode`, persisted per-vehicle). `modeTitle(mode)`, `switchHit(el,x,y)` (live-rect hit-test),
 `setSwitchHot(el,hot)`, `renderModeSwitch(root,data)`/`hideSwitch(root)`. The title is **rendered
 only** — it lives in the header, which the root's `pointer-events:none` covers.
+- **The alternative is top-priority-other, NOT a forward cycle.** `renderModeSwitch`
+  (`WGModResearch.js:1513`) picks `const target = idx === 0 ? avail[1] : avail[0];` — i.e. the
+  highest-priority available mode other than the current one, since `avail` is priority-ordered by
+  Python `builder._BUILDERS`. With exactly 2 modes this is a plain A↔B toggle. **With 3+ modes only
+  the top two are click-reachable** — e.g. `elite` sitting behind both `field_mods` and
+  `potential_tier_xi` can never be reached from the switch. Deliberate, user-approved tradeoff
+  (predictable two-way toggle beats a cycle that walks you through modes you didn't want); if a
+  third mode must become reachable, that needs a real picker, not a tweak here.
+- **This is the ONLY mode-selection logic living outside Python** — everything else about mode
+  choice (`availModes` ordering, `selectMode`, `modeOverrides`) is Python and covered by pytest.
+  The target pick above is JS, so **the Python-only suite cannot catch a regression in it**; verify
+  it in-client (switch a vehicle that qualifies for 3+ modes and check the dimmed title).
 - **Header input routing (the hard part).** The switch title sits in the HEADER, above the bar.
   Input there is delivered by **extending the bar's `.wg-hot` layer UP over the header** (`top:-26rem`)
   — `.wg-hot` is the one proven-interactive layer. `ensureHover`'s `mousemove`/`click`/`mouseleave`

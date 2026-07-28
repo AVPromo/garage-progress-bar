@@ -1431,8 +1431,9 @@ function eliteGlyph(t, isRewards) {
 // `availModes` (comma-joined); when there are >=2 we render the NEXT one's title dimmed
 // beside the current one. Hover raises its opacity; a click fires selectMode, which
 // stores the choice per-vehicle and re-pushes -- the bar then repaints in that mode and
-// the previously-active title becomes the new switch (a clean A<->B swap with 2 modes; a
-// forward cycle with 3+).
+// the previously-active title becomes the new switch. The target is always the
+// HIGHEST-PRIORITY mode other than the current one, so the switch is an A<->B swap between
+// the top two available modes (lower-priority modes are deliberately not click targets).
 
 // The localized header title for a mode -- the SAME keys render() / renderElite() use for
 // .wg-label (elite's grade-name suffix is intentionally omitted; the switch shows the base).
@@ -1507,7 +1508,9 @@ function renderModeSwitch(root, data) {
         switchEl._wgTarget = null;
         return;
     }
-    const target = avail[(idx + 1) % avail.length];
+    // `avail` is priority-ordered (Python builder._BUILDERS), so the alternative is the top
+    // mode unless we're already on it. Guarded above: avail[1] only reached when length >= 2.
+    const target = idx === 0 ? avail[1] : avail[0];
     const prevTarget = switchEl._wgTarget;
     switchEl.textContent = modeTitle(target);
     switchEl._wgTarget = target;
