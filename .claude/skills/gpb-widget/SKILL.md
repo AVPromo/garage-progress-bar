@@ -108,7 +108,9 @@ Scale setting's `.wg-large` is asymmetric x2.0/x1.5). Don't hunt for a mod-side 
 element added to the `.wg-xp` header region — or anywhere that carries a `*rem` size — MUST ALSO
 be restated in the `#wgmod-root.wg-large` block, or it silently keeps its Default size in Large
 mode. Precedent: the `.wg-xp-pct` span needed its own `#wgmod-root.wg-large .wg-xp-pct` rule
-(x1.5 font/spacing/margin); the base rule stays byte-for-byte untouched.
+(x1.5 font/spacing/margin); the base rule stays byte-for-byte untouched. `em` appears **zero**
+times in this widget's CSS — the house pattern is rem-only, delegated to the engine root font — so a
+new rule that must scale carries an explicit `.wg-large` restatement rather than reaching for `em`.
 
 Buff-line icon vertical alignment lives on `.wg-tip-buff-ico` (`align-self: flex-start`,
 top-aligning the vehParams icon to the FIRST line of the buff text in BOTH scale modes — the
@@ -129,6 +131,23 @@ resolve. Emblem path arrives as `t.icon` (`prestige/emblem/<size>/<family>/<sub>
 `gradeFamily()` parses `<family>`; level digits are `emblemFont/<family>/<digit>.png` glyph divs
 (NOT CSS text), `enamel`→`gold` fallback, `1` glyph narrower (`wg-emblem-digit-one`). MAX (lvl
 350) = numberless prestige hexagon inside the arrowhead (`ELITE_TAB_FORCE_MAX` to test).
+- **`eliteTipIconHtml()` is hard-coded for the tooltip's MAIN icon slot** — its markup arrives
+  `position:absolute; top:0; right:0`, 55rem square. Reusing it anywhere in normal flow (e.g. a
+  tooltip FOOTER row) needs an override to `position:relative` — **not `static`**, the box must stay
+  the positioning context for the `.wg-tip-icon-num` digit overlay — plus an explicit box size. Cheap
+  size to reuse: the below-bar tick emblem's 30rem (Large 45rem), because the existing digit-glyph
+  rules already fit a 3-digit level in that box, so the overlay needs no new rules at all. Precedent
+  + the reasoning inline: `.wg-tip-foot .wg-tip-icon-elite` (WGModResearch.css ~1093-1111).
+  Any OTHER box size also breaks the `.wg-tip-icon-num` digit overlay in two ways that must BOTH be
+  fixed: (a) the overlay's `top: 2rem` (Large `3rem`) centering nudge is ~4% of a 55rem box but ~1/8
+  of a 16-24rem one, so the number sits visibly low → reset to `top: 0`; (b) the digit glyphs
+  (`8.125 × 16.25rem`, Large `12.1875 × 24.375rem`) overflow a small box entirely → rescale, keeping
+  the below-bar tick emblem's proven ~56% fill for 3 digits (a level can reach 350). As shipped on
+  the ELITE_REWARDS cost row: a 24rem badge (Large 36rem) takes 4.5 × 9rem digits (Large
+  6.75 × 13.5rem) — `WGModResearch.css:1876-1917`. NB when the reuse site can supply its own
+  positioning context, KEEPING the inherited `position:absolute` is preferable — that's what pins the
+  badge via `right: 0` — and an absolutely positioned box is a containing block for the digit overlay
+  just as a relative one is.
 - **The grade-tick badge NUMBER rides on `t.level`, NOT `t.position`.** `t.level` (= `g.level`,
   the elite level number like 10/13/16 — matching WoT's own prestige-tab badge) is the numeral;
   `t.position` (= `xp_position`) is now the cumulative-XP PLACEMENT on the axis, a different
@@ -224,6 +243,33 @@ or `wrap` drops the phrase under the value and `pre-wrap` turns the literal spac
 the value and desc spans into a visible extra gap.
 *(Propagate the two blocks above to the harness `wotmod-gameface-widget` CSS-gotchas list — they
 are generic Coherent behaviour, not mod-specific. Not edited here.)*
+
+### Scoping a rule to ONE tooltip variant — `xpFracHtml`'s `tailHtml`
+`xpFracHtml(have, need, iconUrl, vehHave, est, tailHtml)` (`WGModResearch.js:436`) takes an optional
+trailing `tailHtml`: when non-empty it both appends that markup INSIDE the headline cost row AND adds
+a `wg-tip-xp-tail` modifier class to the row (`:447-449`). That modifier is the hook for styling the
+cost row of ONE tooltip type without touching the four other call sites (tech-tree/module, field-mod,
+skill-tree chips, elite grade band) — they pass no tail, so their markup and computed style stay
+byte-identical. This is the house answer to "scope a rule to one tooltip variant": an explicit
+JS-applied class, never `:has()`/`:not()` (both documented unreliable here). Live use: hanging the
+elite-level badge on the ELITE_REWARDS reward tooltip, with `min-width` (200/300rem) reserving room
+and `padding-right` (32/48rem) keeping the in-flow text from sliding under the out-of-flow badge
+(`WGModResearch.css:1850-1870`).
+
+### Absolute-position centering — only an explicit `top` moves the box
+Vertical centering via `top: 0; bottom: N; margin-top: auto; margin-bottom: auto` on a definite-height
+absolutely positioned box is **silently ignored** by Coherent: the engine resolves `top`, treats the
+auto margins as `0`, and ignores `bottom` outright. Confirmed the hard way — four successive `bottom`
+values (2 → 4 → 6 → 26rem) moved the element **zero pixels** in-client, where the spec says the box
+should rise by `bottom/2` independent of container height. A plain explicit `top` IS honoured; use
+that (a negative `top` for an upward offset). Recorded in-file with a "don't reach for this idiom"
+warning at `.wg-tip-xp-tail .wg-tip-icon-elite` (`WGModResearch.css` ~1876-1888).
+**Debugging lesson, because it cost four rounds:** when an in-client observation says "nothing moved",
+believe it over the spec-derived reasoning on the FIRST null result. This engine's layout is a subset
+of CSS, so "it should work per the spec" is not evidence.
+*(Generic Coherent behaviour — propagate to the harness `wotmod-gameface-widget` CSS-gotchas list
+alongside "box-shadow needs a fill" / "transform needs explicit dims" / ":not() unreliable".
+Propagated — the harness list now carries a terse version of this entry.)*
 
 ## Done markers
 A tick/chip with `t.done`/`u.done` renders the green-check treatment (`wg-done`, `doneGlyph()` /

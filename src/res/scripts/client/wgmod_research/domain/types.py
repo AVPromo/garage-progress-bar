@@ -37,7 +37,7 @@ class Tick(object):
                  xp_gained, xp_required, affordable, completed, locked=False,
                  level=0, options=None, state="", action_id=0,
                  kind_label="", prereq_names=None, effect="", option_effects=None,
-                 done=False, int_cd=0):
+                 done=False, int_cd=0, level_icon=""):
         self.xp_position = xp_position
         # vehicle | module (tech-tree unlock kind) | fieldmod. Drives the
         # per-tick glyph in the view (a bar is all-tech-tree or all-field-mods,
@@ -95,6 +95,9 @@ class Tick(object):
         # bridge can look up its live credits buy price + ownership at marshal time.
         # 0 for ordinary ticks (they use action_id for the actionable id instead).
         self.int_cd = int_cd
+        # Grade-emblem img:// URL for the elite level in `level` -- reward ticks only,
+        # so the tooltip can show the level required for the reward. "" otherwise.
+        self.level_icon = level_icon
 
 
 class UnlockItem(object):

@@ -201,6 +201,20 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
     (ELITE grade band is the exception — its `scale_min`/`scale_max` ARE cumulative-XP bounds now,
     so its fill == its readout %.) Anyone adding an XP-based readout must take `progress_required`
     from the builder/resolver, never divide by a level/count `scale_max`.
+- **There is NO compact numbered "Elite Level <N>" string in the client (EU 2.3.1.0)** — a
+  "required level N" caption cannot be composed from game resources. The only semantic match,
+  `veh_skill_tree:vanity/reward/level/tooltip` = "Elite Level required for reward"
+  (`R.strings.veh_skill_tree.vanity.reward.level.tooltip()`, declared
+  `<decompiled>/res/scripts/client/gui/impl/gen/resources/strings.py:126571`), is **macro-less** —
+  no number slot. `prestige:tooltip/eliteLevel/title` is "Elite System" (already wired as
+  `headerElite`), `prestige:tooltip/grades/header` the plural "Elite Levels" (already
+  `capEliteLevel`); the only numbered form anywhere is a whole sentence
+  (`messenger:serviceChannelMessages/invoiceReceived/prestigeSet/justLevel`, "The %(vehicleName)s
+  received Elite Level %(level)s."). **Convention:** render a required level as the existing
+  plural `capEliteLevel` label plus the NUMBER painted over the grade emblem — the pattern the
+  ELITE grade-band tooltip already uses (gpb-widget → `eliteTipIconHtml`). Verified by parsing
+  every `.mo` under `res/text/lc_messages` (no msgstr matches `^Elite Level$`) — that parse is how
+  you answer "does this string exist / does it take a macro" with the client CLOSED.
 - **Settings-panel localization — read `wotmod-i18n-settings` FIRST.** The reusable MSA-panel
   pattern (lang-major tables with English master + per-key fallback + untranslated-leak diagnostic,
   `getClientLanguage`/`_norm` incl. `ua`→`uk`, `{HEADER}/{BODY}` tooltip assembly, and THE gotcha —

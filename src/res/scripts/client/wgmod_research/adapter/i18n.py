@@ -115,7 +115,13 @@ def widget_labels():
     # Field-mod per-tick caption reuses the field-mods header (its roman numeral already
     # rides the hexagon glyph, so it's not repeated in the caption).
     out["capFieldMod"] = out["headerFieldMods"]
-    # Elite tick caption -> the game's "Elite Levels" label; JS appends the level number.
+    # Elite tick caption -> the game's "Elite Levels" label. Used by BOTH elite tooltips:
+    # the grade band's caption and the reward footer's required-level row, each painting
+    # the level NUMBER over the emblem instead of into the text.
+    # Don't go hunting for a numbered singular: the client ships none. The nearest match,
+    # veh_skill_tree:vanity/reward/level/tooltip, is the macro-less sentence "Elite Level
+    # required for reward" (checked in res/text/lc_messages/veh_skill_tree.mo), and
+    # prestige.tooltip.eliteLevel.title is just "Elite System" (already headerElite).
     out["capEliteLevel"] = _text(
         lambda: _S().prestige.tooltip.grades.header(), _FALLBACK["capEliteLevel"])
     # Locked-prerequisite label -> the game's own "required:" (the prereq NAMES are

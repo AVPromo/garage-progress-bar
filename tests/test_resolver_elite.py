@@ -218,6 +218,29 @@ def test_reward_track_all_earned_has_no_unearned():
     assert all(tk.state == "achieved" for tk in res["ticks"])
 
 
+def test_reward_track_ticks_carry_required_level_and_emblem():
+    # Each reward tick carries the elite level it unlocks at (`level`) plus that level's
+    # grade emblem, so the tooltip footer can show "Elite Level <N>" beside the XP cost.
+    grades = [_grade(1, "iron", 1, True), _grade(10, "bronze", 1, True),
+              _grade(13, "bronze", 2)]
+    rewards = [_reward(5, True), _reward(13, False)]
+    res = elite.resolve_reward_track(
+        _snap(8, grades=grades, rewards=rewards, max_level=20))
+    assert [tk.level for tk in res["ticks"]] == [5, 13]
+    assert [tk.level_icon for tk in res["ticks"]] == [
+        "img://gui/maps/icons/prestige/emblem/72x72/iron/1.png",   # 5 -> iron1 (@1)
+        "img://gui/maps/icons/prestige/emblem/72x72/bronze/2.png"]  # 13 -> bronze2 (@13)
+
+
+def test_reward_track_level_icon_empty_without_a_resolvable_grade():
+    # No grades at all (or a level below the first threshold) -> no emblem, but the
+    # required level still rides along.
+    rewards = [_reward(50, False)]
+    res = elite.resolve_reward_track(_snap(10, grades=[], rewards=rewards))
+    assert res["ticks"][0].level == 50
+    assert res["ticks"][0].level_icon == ""
+
+
 def test_reward_track_empty_returns_none():
     assert elite.resolve_reward_track(_snap(0, rewards=[])) is None
 

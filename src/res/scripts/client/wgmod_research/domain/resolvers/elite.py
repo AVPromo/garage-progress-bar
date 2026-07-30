@@ -237,15 +237,22 @@ def resolve_reward_track(snapshot):
     max_level = snapshot.elite_max_level or rewards[-1].level
     scale_max = max(r.level for r in rewards)
     level_xp = snapshot.elite_level_xp or {}
+    grades = sorted(snapshot.elite_grades, key=lambda g: g.level)
 
     ticks = []
     for r, state in _mark_states(rewards, lambda r: r.achieved):
         # type label rides along in `options` so the JS tooltip can show it.
         opts = [r.type_label] if r.type_label else []
+        # The reward's REQUIRED elite level (`level`) + that level's grade emblem, so
+        # the tooltip footer can show it beside the XP cost. NB `level` is unused on the
+        # rewards render path otherwise (the badge numeral is grade-band only).
+        grade = _current_grade(grades, r.level)
         ticks.append(t.Tick(
             xp_position=r.level, category=Category.REWARD, icon=r.icon,
             name=r.label, xp_gained=0, xp_required=level_xp.get(r.level, 0),
-            affordable=False, completed=r.achieved, state=state, options=opts))
+            affordable=False, completed=r.achieved, state=state, options=opts,
+            level=r.level,
+            level_icon=_emblem_url(grade.grade, grade.sub) if grade else ""))
 
     frac = _fill_fraction(snapshot.elite_current_xp, snapshot.elite_next_xp)
     position = _clamp(level + frac, 0, scale_max)

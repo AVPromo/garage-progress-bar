@@ -430,15 +430,24 @@ function estDivisor(est) {
     return (est.acctAvg | 0) || (est.avg | 0);
 }
 
-function xpFracHtml(have, need, iconUrl, vehHave, est) {
+// `tailHtml` (optional) rides at the END of the headline row -- the elite-rewards footer
+// hangs its required-level badge there as an OUT-OF-FLOW box: absolutely positioned, pinned
+// by the inherited right:0 and placed vertically by an explicit top (not by flex centering
+// or auto margins -- Coherent ignores both, see gpb-widget). Absent for every other caller.
+function xpFracHtml(have, need, iconUrl, vehHave, est, tailHtml) {
     need = need | 0;
     if (need <= 0) return "";
     have = have | 0;
     const ico = xpIco(iconUrl || XP_ICON);   // headline currency (reused by total remaining)
     // Unaffordable ("not yet reachable") -> the cost itself is tinted the shortfall red,
     // the same signal it carried before the cost-only headline change.
-    const cls = have < need ? "wg-tip-xp wg-tip-short" : "wg-tip-xp";
-    let h = '<div class="' + cls + '">' + fmtXp(need) + ico + "</div>";
+    // `wg-tip-xp-tail` widens the row (and with it the content-sized tooltip) so the tail
+    // badge separates from the cost figure. Added ONLY when there is a tail, so every other
+    // tooltip's markup + computed style are untouched. An explicit modifier class, not a
+    // :has()/:not() selector -- both are unreliable in this Coherent build.
+    const cls = (have < need ? "wg-tip-xp wg-tip-short" : "wg-tip-xp") +
+        (tailHtml ? " wg-tip-xp-tail" : "");
+    let h = '<div class="' + cls + '">' + fmtXp(need) + ico + (tailHtml || "") + "</div>";
     // Two shortfalls: `left` counts free XP (drives affordability + the headline tint);
     // `vehLeft` is the combat-XP-only gap (free XP ignored). The item can be affordable
     // (left <= 0) while combat XP alone still falls short (vehLeft > 0) -- free XP covers
@@ -1810,6 +1819,16 @@ function render(model) {
     renderModeSwitch(root, data);
 }
 
+// ELITE_REWARDS only: the elite level this reward unlocks at, as a bare badge -- no
+// caption. Same visual language as ELITE mode's tooltip: eliteTipIconHtml paints the
+// level number over the grade emblem in the emblemFont, which says "elite level N" on
+// its own, so no text row is needed. "" when the level is 0 or no emblem resolved.
+function eliteLevelReqHtml(t) {
+    const lvl = t.level | 0;
+    if (lvl <= 0 || !t.levelIcon || t.levelIcon.indexOf("img://") !== 0) return "";
+    return eliteTipIconHtml(t.levelIcon, lvl);
+}
+
 // Tooltip body for an elite mark: the grade/reward name, (rewards) the reward
 // type, and the elite level the mark sits at.
 function eliteTooltipHtml(t, isRewards, combatXp, est) {
@@ -1836,8 +1855,12 @@ function eliteTooltipHtml(t, isRewards, combatXp, est) {
     let text = caption ? capHtml(caption) : "";
     if (name) text += '<div class="wg-tip-name">' + escapeHtml(name) + "</div>";
     // Footer: progress to this milestone as "<earned> / <needed> combat XP" (the
-    // tick's xpRequired is the cumulative combat XP to reach the level).
-    const foot = xpFracHtml(combatXp, t.xpRequired, COMBAT_XP_ICON, undefined, est);
+    // tick's xpRequired is the cumulative combat XP to reach the level). Rewards hang the
+    // required-elite-level badge on that same cost line (the tail arg), pinned to its far
+    // end. A reward with no readable cost renders no footer at all, and the badge goes with
+    // it -- its level still rides the bar tick's own glyph.
+    const foot = xpFracHtml(combatXp, t.xpRequired, COMBAT_XP_ICON, undefined, est,
+        isRewards ? eliteLevelReqHtml(t) : "");
     return joinSections([tipMain(iconHtml, text), foot]);
 }
 

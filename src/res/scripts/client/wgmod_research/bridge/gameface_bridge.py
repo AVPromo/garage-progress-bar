@@ -788,6 +788,7 @@ def push(rvm, host_vm=None):
                 tv.setLocked(bool(t.locked))
                 tv.setIcon(t.icon or "")
                 tv.setLevel(t.level or 0)
+                tv.setLevelIcon(getattr(t, "level_icon", "") or "")
                 tv.setOptions("\n".join(t.options or []))
                 tv.setState(t.state or "")
                 tv.setActionId(t.action_id or 0)

@@ -17,7 +17,7 @@ from frameworks.wulf import ViewModel, Array
 
 
 class TickVM(ViewModel):
-    def __init__(self, properties=17, commands=0):
+    def __init__(self, properties=18, commands=0):
         super(TickVM, self).__init__(properties=properties, commands=commands)
 
     def _initialize(self):
@@ -39,6 +39,7 @@ class TickVM(ViewModel):
         self._addStringProperty("optionEffects", "")  # 14 (per-variant buffs, \n-joined, aligned w/ options)
         self._addBoolProperty("done", False)      # 15 (session "done" marker: green check + open-screen click)
         self._addNumberProperty("price", 0)       # 16 (done tick: credits buy price, 0 = hide footer)
+        self._addStringProperty("levelIcon", "")  # 17 (reward tick: grade emblem for the required elite level)
 
     def setPosition(self, v):
         self._setNumber(0, v)
@@ -90,6 +91,9 @@ class TickVM(ViewModel):
 
     def setPrice(self, v):
         self._setNumber(16, v)
+
+    def setLevelIcon(self, v):
+        self._setString(17, v)
 
 
 class UpgradeVM(ViewModel):
