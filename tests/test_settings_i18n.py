@@ -196,6 +196,36 @@ def test_client_language_falls_back_on_error(monkeypatch):
     assert S.client_language() == u"en"
 
 
+# --- label(): one mod-invented label, reused by the WIDGET ------------------
+# i18n.headerComplete ("Fully Progressed") sources the COMPLETE bar's header from this
+# table instead of duplicating the translations.
+
+def test_label_english_master_is_unmarked(monkeypatch):
+    monkeypatch.setattr(i18n, u"MARK_UNTRANSLATED", True)
+    assert S.label(u"showWhenComplete", lang=u"en") == u"Fully Progressed"
+
+
+def test_label_localized_per_language():
+    assert S.label(u"showWhenComplete", lang=u"uk") == u"Повністю пройдено"
+    assert S.label(u"showWhenComplete", lang=u"de") == u"Vollständig fortgeschritten"
+
+
+def test_label_unknown_language_falls_back_to_marked_english(monkeypatch):
+    monkeypatch.setattr(i18n, u"MARK_UNTRANSLATED", True)
+    assert S.label(u"showWhenComplete", lang=u"xx") == u"_Fully Progressed"
+
+
+def test_label_unknown_key_is_empty(monkeypatch):
+    monkeypatch.setattr(i18n, u"MARK_UNTRANSLATED", True)
+    assert S.label(u"noSuchKey", lang=u"en") == u""      # no mark on an empty string
+
+
+def test_label_defaults_to_the_client_language(monkeypatch):
+    # How the widget actually calls it (no lang arg) -> client language, en fallback.
+    monkeypatch.delitem(sys.modules, u"helpers", raising=False)
+    assert S.label(u"showWhenComplete") == u"Fully Progressed"
+
+
 def test_panel_text_labels_and_english_tooltips(monkeypatch):
     monkeypatch.delitem(sys.modules, u"helpers", raising=False)   # -> en, WG English
     t = S.panel_text()

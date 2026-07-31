@@ -346,6 +346,20 @@ def render_panel(wg_labels, lang=None):
     return out
 
 
+def label(key, lang=None):
+    """ONE mod-invented label in the client language -- the same resolution
+    ``render_panel`` does for a non-feature control (English master, marked on fallback).
+    Exposed because the WIDGET needs one of these strings too: "Fully Progressed"
+    (``showWhenComplete``) is also the COMPLETE bar's header, and the game ships no
+    equivalent, so ``i18n.headerComplete`` reuses this table instead of duplicating the
+    translations. Pure given ``lang``."""
+    code = _norm(lang if lang is not None else client_language())
+    labels = _LABELS.get(code) or {}
+    if key in labels:
+        return labels[key]
+    return i18n._mark(_LABELS[DEFAULT_LANGUAGE].get(key, u""))
+
+
 def _scale_options(code):
     """The localized scale-Dropdown option labels ``[Default, Large]`` for language
     ``code`` (English fallback, marked on fallback -- same policy as the mod-invented

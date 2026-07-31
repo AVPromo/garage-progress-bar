@@ -27,7 +27,8 @@ class Mode(object):
                                 # XP toward a representative tier-XI cost (sits above ELITE)
     ELITE_REWARDS = "elite_rewards"  # tier XI w/ unearned milestone rewards: reward roadmap
     ELITE = "elite"             # elite + prestige: current grade-band progression
-    COMPLETE = "complete"       # elite, no prestige data: "fully researched" badge
+    COMPLETE = "complete"       # every applicable category finished: "Fully Progressed"
+                                # (full bar + one icon per completed category)
     HIDDEN = "hidden"           # the mode this vehicle resolved to is disabled by a user
                                 # toggle -> hide the bar (bar_visible returns False)
 

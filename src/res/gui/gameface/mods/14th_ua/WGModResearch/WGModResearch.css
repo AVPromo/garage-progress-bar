@@ -99,6 +99,15 @@
     margin-top: 0;             /* 1rem lower than the base optical up-nudge (-1rem) */
 }
 
+/* COMPLETE ("Fully Progressed") uses done_big.png, whose checkmark fills its art edge
+   to edge -- at the shared 36rem box it out-weighs every other category glyph. Take it
+   to ~2/3 (same treatment as .wg-skill above); base rule keeps shadow + up-nudge. */
+#wgmod-root.wg-complete .wg-cat-icon {
+    width: 24rem;
+    height: 24rem;
+    margin-top: 0;             /* 1rem lower than the base optical up-nudge (-1rem) */
+}
+
 #wgmod-root .wg-label {
     font-size: 13rem;
     font-weight: 700;
@@ -376,6 +385,15 @@
     background: #9160d0;
     opacity: 1;
 }
+/* COMPLETE ("Fully Progressed"): a full GOLDEN bar -- the reward tone of a finished
+   vehicle. No existing fill reuses cleanly (the elite gold is flat + mode-scoped), so
+   this is the widget's one gradient: a single non-tiling linear-gradient, which Coherent
+   renders reliably (unlike repeating/conic ones). Lifted from the prestige gold family
+   (#d9a441 == the .wg-elite fill) with a lighter mid so the full bar doesn't read flat. */
+#wgmod-root.wg-complete .wg-fill-veh {
+    background: linear-gradient(90deg, #d9a441, #ecbe6e, #e8b84b);
+    opacity: 1;
+}
 
 /* ============================================================================
    COLOR-BLIND palette (.wg-colorblind, mirrors WoT's own "isColorBlind" mode).
@@ -392,6 +410,11 @@
 }
 /* ELITE grade-band fill: prestige gold -> WG color-blind orange (255 170 76). */
 #wgmod-root.wg-colorblind.wg-elite .wg-fill-veh {
+    background: #ffaa4c;
+}
+/* COMPLETE fill: the golden gradient -> flat WG color-blind orange, like the elite fill
+   (same gold family, same substitution). */
+#wgmod-root.wg-colorblind.wg-complete .wg-fill-veh {
     background: #ffaa4c;
 }
 /* ELITE_REWARDS fill: rarity purple -> WG color-blind purple (192 128 255). */
@@ -947,6 +970,7 @@
 #wgmod-root .wg-tip-main-veh    { padding-right: 105rem; min-height: 50rem; }  /* .wg-tip-icon-veh 90x50 */
 #wgmod-root .wg-tip-main-reward { padding-right: 65rem; min-height: 50rem; }  /* .wg-tip-icon-reward 50 */
 #wgmod-root .wg-tip-main-mod    { padding-right: 65rem; min-height: 50rem; }  /* .wg-tip-icon-mod 50 */
+#wgmod-root .wg-tip-main-cat    { padding-right: 44rem; min-height: 32rem; }  /* .wg-tip-icon.wg-cat-fam-* 32 */
 #wgmod-root .wg-tip-text {
     min-width: 0;
     overflow-wrap: break-word;  /* break an unbreakable token so it wraps inside .wg-tooltip's max-width */
@@ -1383,6 +1407,126 @@
     height: 13rem;
     margin: -6.5rem 0 0 -6.5rem;
 }
+/* COMPLETE ("Fully Progressed"): one finished-category box in the below-bar row. The box
+   itself IS a .wg-chip (size, spacing, pointer-events, its nested .wg-chip-tip tooltip and
+   the .wg-large restatement all come free); this only fills it with the category's section
+   icon. The green corner check is the shared .wg-done-badge. Inset 0 + background-size:
+   contain means it scales with the .wg-large chip box, so it needs no Large restatement. */
+#wgmod-root .wg-cat-done-ico {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    filter: drop-shadow(0 1rem 2rem rgba(0, 0, 0, 0.85));
+}
+
+/* COMPLETE category icon FAMILY normalization -- applied to BOTH sites the icon appears
+   (the row box .wg-cat-done-ico above AND the tooltip's .wg-tip-icon), so one rule pair
+   covers both. The two families fill their canvas very differently, so a shared
+   `background-size: contain` renders them ~1.8x apart in apparent glyph size. Measured
+   alpha bounding boxes of the packed art:
+     white  (vehicleMenu/large, 64x64): research 32x17 = 0.50, fieldModification 35x19
+            = 0.55, vehSkillTree 36x26 = 0.56 of the canvas
+     emblem (prestige/emblem/72x72):    every grade + prestige.png = 0.93-0.96
+   So: blow the white family up past 100% (its transparent margin gets cropped, which is
+   exactly what we want -- all three glyphs are canvas-centered, so a centered crop keeps
+   them whole) and hold the emblems just under `contain`. 170% takes white to 0.85-0.96 of
+   the box; 88% takes the emblems to 0.82-0.84 -- the emblem lands marginally smaller on
+   purpose, since a solid filled hexagon reads heavier than white line art at equal extent.
+   Percentages (not rem) so both scale with the box and need NO .wg-large restatement.
+   These MUST come after .wg-tip-icon / .wg-cat-done-ico: same specificity (1 id + 1
+   class), so source order decides the background-size. */
+#wgmod-root .wg-cat-fam-white {
+    background-size: 170%;
+    background-position: center;    /* .wg-tip-icon pins `center top`; with a >100% size
+                                       that pushes the cropped glyph out the bottom */
+}
+#wgmod-root .wg-cat-fam-emblem {
+    background-size: 88%;
+    background-position: center;
+}
+/* The COMPLETE category tooltip's icon box, ~2x smaller than the shared 65rem
+   .wg-tip-icon square (a plain section glyph needs nowhere near the room a module /
+   vehicle / emblem thumbnail does). Normalization above is a background-size RATIO, so it
+   survives the shrink untouched. Needs a .wg-large restatement: the Large .wg-tip-icon
+   rule carries equal specificity and sits later in the file.
+   Lifted a quarter box (8rem) so the small glyph sits level with the title's first line
+   instead of hanging below it. The lever is an explicit negative `top` overriding
+   .wg-tip-icon's `top: 0` -- NOT margin-top: Coherent resolves `top` and treats margins on
+   an out-of-flow box as unreliable (see the .wg-tip-xp-tail warning below). 8rem is half
+   the tooltip's own top padding + border (12+4), so the box stays well inside the frame's
+   outer top edge and the glyph (inset ~5-9rem inside the box by the 170% normalization)
+   can't escape the frame. The icon is out of flow and .wg-tip-main-cat's
+   32rem min-height is unchanged, so no text row reflows into the freed space. */
+#wgmod-root .wg-tip-icon.wg-cat-fam-white,
+#wgmod-root .wg-tip-icon.wg-cat-fam-emblem {
+    width: 32rem;
+    height: 32rem;
+    top: -8rem;
+}
+
+/* ELITE category badge (ELITE only -- see renderCompleteCats' eliteCat): the level number
+   painted over the emblem, at BOTH sites the icon appears -- the tooltip icon box here,
+   the below-bar row box further down.
+   Both need their own digit size, because both host boxes differ from every existing badge
+   host AND from each other.
+   THE RATIO comes from the shipped ELITE bar mode (#wgmod-root.wg-elite .wg-cat-icon, the
+   emblem-style header badge): a 23rem box at background-size:contain carries 4.2 x 8.4rem
+   digits and a 3rem "1" -- i.e. digit height 0.3652 of the emblem's rendered extent, width
+   exactly half the height, "1" 0.1304. (Its .wg-large restatement -- 34.5rem box, 6.3 x
+   12.6, 4.5 -- holds the identical ratio, which is what makes it the invariant to copy.)
+   The catch: `contain` means emblem == box THERE, but both hosts here render the emblem at
+   `background-size: 88%` (the .wg-cat-fam-emblem normalization above), so the ratio applies
+   to 0.88 x box, not to the box:  digit height = 0.3652 * 0.88 * box = 0.3214 * box.
+   This 32rem box -> emblem 28.16rem -> 5.15 x 10.3rem, "1" 3.7rem. (Left alone it would
+   inherit .wg-tip-icon-num's 8.125 x 16.25 -- sized for the 55rem grade-tick box, ~58% too
+   big here.) `top: 0` drops that rule's 2rem centering nudge, which is ~4% of a 55rem box
+   but ~6% of this one: the ELITE reference badge sits dead center, so this one does too.
+   Every rule below outranks its unscoped counterpart on SPECIFICITY (1 id + 2/3 classes vs
+   1 id + 1/2), so none of them depends on source order -- except -digit-one vs -digit,
+   which tie, hence "1" last. */
+#wgmod-root .wg-cat-fam-emblem .wg-tip-icon-num {
+    top: 0;
+}
+#wgmod-root .wg-cat-fam-emblem .wg-tip-icon-num .wg-emblem-digit {
+    width: 5.15rem;
+    height: 10.3rem;
+}
+#wgmod-root .wg-cat-fam-emblem .wg-tip-icon-num .wg-emblem-digit-one {
+    width: 3.7rem;
+}
+
+/* Bottom-row boxes ONLY: 2rem smaller than the shared normalization above, and the
+   skill-tree glyph a further 5rem (7rem total -- its line art has the widest fill of the
+   three, so it read heaviest at a common size). The tooltip's normalization is deliberately
+   left alone. The lever stays a background-size PERCENTAGE, so the reduction scales with the
+   box and needs NO .wg-large restatement: the rendered glyph is `box * fill * size`, so at
+   the 30rem .wg-chip box 1% of size == 0.3rem * fill; with the white family's measured fill
+   (0.50-0.5625, avg ~0.537) -12% takes ~2rem off (170 -> 158), and at vehSkillTree's own
+   0.5625 fill (1% == 0.169rem) -42% takes ~7rem off (170 -> 128).
+   In Large the same percentages come off the 45rem chip box -- ~3rem / ~10.5rem, exactly the
+   stylesheet's 1.5x factor. Equal specificity (1 id + 2 classes) between the two rules and
+   the family rule, so SOURCE ORDER decides: skill-tree last. */
+#wgmod-root .wg-cat-done-ico.wg-cat-fam-white    { background-size: 158%; }
+#wgmod-root .wg-cat-done-ico.wg-cat-m-skill_tree { background-size: 128%; }
+
+/* The row box's own level digits -- same ELITE-mode ratio worked out for the tooltip icon
+   above (digit height = 0.3214 * box, width = half, "1" = 0.1148 * box), applied to THIS
+   host's size: the 30rem .wg-chip box -> emblem 26.4rem -> 4.8 x 9.6rem, "1" 3.4rem.
+   (Left alone it inherits the tick emblem's base 5.5 x 11 -- correct for a box rendered at
+   `contain`, ~15% too big at 88%.) Restated for .wg-large below at the stylesheet's 1.5x. */
+#wgmod-root .wg-cat-done-ico .wg-emblem-digit {
+    width: 4.8rem;
+    height: 9.6rem;
+}
+#wgmod-root .wg-cat-done-ico .wg-emblem-digit-one {
+    width: 3.4rem;
+}
+
 /* Skill-tree FINAL upgrade: the same framed glyph, hung below the rightmost tick. */
 #wgmod-root .wg-final {
     position: absolute;
@@ -1485,6 +1629,11 @@
 #wgmod-root.wg-large.wg-skill .wg-cat-icon {
     width: 45rem;
     height: 45rem;
+}
+#wgmod-root.wg-large.wg-complete .wg-cat-icon {
+    width: 36rem;
+    height: 36rem;
+    margin-top: 0;             /* 1.5rem lower than the Large up-nudge (-1.5rem) */
 }
 #wgmod-root.wg-large.wg-elite .wg-cat-icon {
     width: 34.5rem;
@@ -1655,6 +1804,17 @@
 #wgmod-root.wg-large .wg-emblem-digit-one {
     width: 6rem;
 }
+/* COMPLETE category row box: 1.5x the Default 4.8 x 9.6 / 3.4 (see .wg-cat-done-ico
+   .wg-emblem-digit) -- the same ELITE-mode ratio taken off the 45rem Large chip box
+   (emblem 39.6rem). Outranks the two rules above on specificity (1 id + 3 classes vs
+   1 id + 2), so it holds wherever it sits; "1" still comes last to break its own tie. */
+#wgmod-root.wg-large .wg-cat-done-ico .wg-emblem-digit {
+    width: 7.2rem;
+    height: 14.4rem;
+}
+#wgmod-root.wg-large .wg-cat-done-ico .wg-emblem-digit-one {
+    width: 5.1rem;
+}
 
 /* --- hover tooltip (the full set) -------------------------------------------- */
 #wgmod-root.wg-large .wg-tooltip {
@@ -1671,9 +1831,21 @@
 #wgmod-root.wg-large .wg-tip-main-veh    { padding-right: 157.5rem; min-height: 75rem; }
 #wgmod-root.wg-large .wg-tip-main-reward { padding-right: 97.5rem; min-height: 75rem; }
 #wgmod-root.wg-large .wg-tip-main-mod    { padding-right: 97.5rem; min-height: 75rem; }
+#wgmod-root.wg-large .wg-tip-main-cat    { padding-right: 66rem; min-height: 48rem; }
 #wgmod-root.wg-large .wg-tip-icon {
     width: 97.5rem;
     height: 97.5rem;
+}
+/* COMPLETE category tooltip icon (see .wg-cat-fam-* above). Must sit AFTER the rule
+   directly above: equal specificity (1 id + 2 classes), so source order decides. The
+   background-size normalization is a percentage, so it carries over with no restatement.
+   `top` is the 1.5x of the Default -8rem lift and again half this scale's tooltip
+   padding + border (18+6), keeping the box inside the frame's top edge. */
+#wgmod-root.wg-large .wg-tip-icon.wg-cat-fam-white,
+#wgmod-root.wg-large .wg-tip-icon.wg-cat-fam-emblem {
+    width: 48rem;
+    height: 48rem;
+    top: -12rem;
 }
 #wgmod-root.wg-large .wg-tip-icon-veh {
     width: 135rem;
@@ -1700,6 +1872,21 @@
 }
 #wgmod-root.wg-large .wg-tip-icon-num .wg-emblem-digit-one {
     width: 8.4375rem;
+}
+/* COMPLETE category tooltip icon: 1.5x the Default 5.15 x 10.3 / 3.7 (see
+   .wg-cat-fam-emblem .wg-tip-icon-num) -- the ELITE-mode ratio off the 48rem Large box
+   (emblem 42.24rem), plus the same dropped centering nudge. Outranks the three rules above
+   on specificity (1 id + 3/4 classes vs 1 id + 2/3), so no source-order dependency beyond
+   its own "1" tie. */
+#wgmod-root.wg-large .wg-cat-fam-emblem .wg-tip-icon-num {
+    top: 0;
+}
+#wgmod-root.wg-large .wg-cat-fam-emblem .wg-tip-icon-num .wg-emblem-digit {
+    width: 7.725rem;
+    height: 15.45rem;
+}
+#wgmod-root.wg-large .wg-cat-fam-emblem .wg-tip-icon-num .wg-emblem-digit-one {
+    width: 5.55rem;
 }
 #wgmod-root.wg-large .wg-tip-hex {
     width: 56.25rem;

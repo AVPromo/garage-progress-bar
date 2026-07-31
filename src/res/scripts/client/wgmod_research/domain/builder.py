@@ -7,7 +7,8 @@ Per selected vehicle:
 - elite + prestige + tier-exclusive rewards still to earn -> ELITE_REWARDS
   (the reward roadmap shown first).
 - elite + prestige (rewards all earned / none) -> ELITE (grade-band progression).
-- elite, no prestige data -> COMPLETE ("fully researched" badge fallback).
+- every category that APPLIES to the vehicle finished -> COMPLETE ("Fully Progressed":
+  a full bar + one icon per completed category; see resolvers/complete).
 
 Fill is the player's spendable XP shown as two stacked segments: vehicle XP
 first, then global free XP. The view treats a scale_min == scale_max range as
@@ -18,7 +19,8 @@ import copy
 
 from wgmod_research.domain import types as t
 from wgmod_research.domain.constants import Category
-from wgmod_research.domain.resolvers import techtree, fieldmods, elite, skilltree, potential
+from wgmod_research.domain.resolvers import (techtree, fieldmods, elite, skilltree,
+                                             potential, complete)
 
 
 def _has_real_tier_xi(snapshot):
@@ -246,12 +248,40 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     def _placeholder(mode):
         # A model with no bar of its own, carrying only the shared fill/counter fields:
         # Mode.HIDDEN (resolved mode toggled off -> bar_visible() hides it) or
-        # Mode.COMPLETE (nothing left to research -> the elite badge).
+        # Mode.COMPLETE when NO category applies at all (nothing readable to report -->
+        # the degenerate scale the widget still hides).
         return t.ResearchProgressModel(
             mode=mode, scale_min=0, scale_max=0,
             fill_vehicle=fill_vehicle, fill_free=fill_free, ticks=[],
             fieldmods_done=fm_done, fieldmods_total=fm_total, vehicle_class=veh_class,
             spendable_xp=spendable, **est)
+
+    def _complete_model(done_cats):
+        # COMPLETE ("Fully Progressed"): every category that applies to this vehicle is
+        # finished. Unlike _placeholder this is a REAL bar -- a non-degenerate 0..1 axis
+        # filled to the top (a 0/0 scale drew nothing, which is why COMPLETE used to be
+        # invisible). The finished categories ride avail_upgrades (already marshalled
+        # unconditionally by the bridge): one entry each, carrying the category id and its
+        # TOTAL raw XP cost, which the widget renders as the below-bar icon row + tooltips.
+        # progress_current is the summed cost (the header's upper-right figure);
+        # progress_required stays 0 -- nothing is left to require.
+        return t.ResearchProgressModel(
+            mode=t.Mode.COMPLETE, scale_min=0, scale_max=1,
+            fill_vehicle=1, fill_free=0, ticks=[],
+            fieldmods_done=fm_done, fieldmods_total=fm_total, vehicle_class=veh_class,
+            spendable_xp=spendable,
+            # The current grade emblem, so the ELITE category's icon can be this
+            # vehicle's own badge (the elite systems have no section glyph of their own).
+            elite_current_icon=elite.current_grade_icon(snapshot),
+            # ...and the level cap, painted over both elite boxes' emblems. COMPLETE means
+            # the vehicle reached it, so the cap IS its elite level (per-vehicle -- the cap
+            # comes from that vehicle's own grade list, see prestige_read).
+            elite_max_level=snapshot.elite_max_level,
+            avail_upgrades=[t.ProgressionStep(step_id=0, name=u"", icon=u"", xp_cost=xp,
+                                              unlocked=True, category=mode, done=True)
+                            for (mode, xp) in done_cats],
+            progress_current=sum(xp for (_m, xp) in done_cats), progress_required=0,
+            **est)
 
     # Enumerate every applicable mode in priority order (each builder embeds its own gate).
     cands = []
@@ -263,21 +293,31 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     # entry-gated on enabled membership, so _on is a safe no-op for it).
     avail = [m for (m, _model) in cands if _on(enabled, m)]
 
-    if not cands:
-        # nothing left to research and no prestige data: COMPLETE (elite badge).
+    by_mode = dict(cands)
+    # Fully progressed: EVERY category that applies to this vehicle is finished (see
+    # resolvers/complete -- [] while anything is still in progress, or when nothing
+    # applies at all). This is the widened COMPLETE gate: it no longer needs `cands` to be
+    # empty, so a maxed-out prestige/skill-tree/rewards vehicle reaches COMPLETE too and
+    # its finished categories can be reported. COMPLETE has no user toggle of its own
+    # (bar_visible's show_when_complete governs it), so toggles don't apply here.
+    done_cats = complete.resolve(snapshot)
+    if override and override in avail:
+        # Player's explicit choice among the available modes -- honored even if the
+        # priority default is disabled (override is drawn from `avail`, i.e. enabled).
+        result = by_mode[override]
+    elif done_cats and t.Mode.POTENTIAL_TIER_XI not in by_mode:
+        # POTENTIAL_TIER_XI still wins when it applies + is opted in: it's a speculative
+        # goal ahead of the vehicle, not a category it has finished.
+        result = _complete_model(done_cats)
+    elif not cands:
+        # Nothing applies and nothing is readable: the old no-bar COMPLETE placeholder.
         result = _placeholder(t.Mode.COMPLETE)
     else:
-        by_mode = dict(cands)
-        if override and override in avail:
-            # Player's explicit choice among the available modes -- honored even if the
-            # priority default is disabled (override is drawn from `avail`, i.e. enabled).
-            result = by_mode[override]
-        else:
-            winner_mode, winner_model = cands[0]
-            # Honor the per-mode user toggle for the priority default: a mode this vehicle
-            # RESOLVED to but which the user turned off hides the bar -- NO fall-through
-            # to a lower-priority mode.
-            result = winner_model if _on(enabled, winner_mode) else _placeholder(t.Mode.HIDDEN)
+        winner_mode, winner_model = cands[0]
+        # Honor the per-mode user toggle for the priority default: a mode this vehicle
+        # RESOLVED to but which the user turned off hides the bar -- NO fall-through
+        # to a lower-priority mode.
+        result = winner_model if _on(enabled, winner_mode) else _placeholder(t.Mode.HIDDEN)
 
     result.avail_modes = avail
     return result

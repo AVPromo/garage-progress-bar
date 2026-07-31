@@ -29,6 +29,50 @@ const GRADE = {                                         // domain/constants.py G
     IRON: "iron", BRONZE: "bronze", SILVER: "silver", GOLD: "gold",
     ENAMEL: "enamel", PRESTIGE: "prestige", UNDEFINED: "undefined",
 };
+// Dev-only flag (flip by hand for a dev build, like _compat._DEBUG on the Python side):
+// forces the Fully Progressed (COMPLETE) render path on EVERY vehicle so it can be
+// inspected in-client without owning a fully-progressed tank. The fake 0..1 scale below
+// stays needed for that -- a vehicle that is NOT complete carries its own real scale +
+// ticks, which would otherwise draw a partial bar. MUST stay false in shipped builds.
+const FORCE_COMPLETE = false;
+// ...and, same dev flag, a fake finished-category row: a not-genuinely-complete vehicle
+// carries an EMPTY availUpgrades (only the real COMPLETE model populates it), so the row
+// would render zero boxes and hide itself. Only `category` + `xpRequired` are read
+// (renderCompleteCats); bar-priority order, matching resolvers/complete.py.
+// The figures are REAL magnitudes (each category's total differs by an order of
+// magnitude in-game, so five similar numbers would misrepresent the readout):
+//   TECH_TREE     119660  a full module set: the 6 unlock edges (chassis/engine/gun/radio)
+//                         of Jagdpanther II, summed from the live client's own
+//                         item_defs/vehicles/germany/G71_JagdPantherII.xml.
+//   SKILL_TREE    325000  every one of the 22 tier-XI trees in the client costs exactly
+//                         this: 26 nodes = 20x10000 + 5x20000 + 1x25000 (node prices from
+//                         item_defs/.../post_progression/prices.xml, per-node price group
+//                         from each veh_skill_configs/*_tree.xml).
+//   FIELD_MODS    224000  8 levels (fieldmods.max_level(10)) x the tier-X per-level price
+//                         28000 (prices.xml unlockBaseModificationCost/level_10).
+//   ELITE_REWARDS 650000  cumulative combat XP at elite level 10 (the last reward
+//                         milestone) -- the prestige XP table is server config, so this is
+//                         the repo's own recorded figure (tests/test_builder.py:516).
+//   ELITE        1300000  cumulative combat XP at the level cap: that same 650000@L10
+//                         extrapolated linearly to the fixture cap of 20 levels. ESTIMATE.
+const FAKE_CATS = FORCE_COMPLETE ? [
+    { category: MODE.TECH_TREE, xpRequired: 119660 },
+    { category: MODE.SKILL_TREE, xpRequired: 325000 },
+    { category: MODE.FIELD_MODS, xpRequired: 224000 },
+    { category: MODE.ELITE_REWARDS, xpRequired: 650000 },
+    { category: MODE.ELITE, xpRequired: 1300000 },
+] : null;
+// The header's upper-right figure under the flag: the SUM of the fake row (2618660), so it
+// can't contradict the tooltips. The REAL path takes it from Python's progress_current,
+// which _complete_model already sets to sum(category totals) -- untouched here.
+const FAKE_CATS_TOTAL = FORCE_COMPLETE
+    ? FAKE_CATS.reduce((a, c) => a + c.xpRequired, 0) : 0;
+// ...and the elite level painted over the two elite boxes' emblems. The REAL path takes it
+// from the model's eliteMaxLevel (per-vehicle: prestige_read derives the cap from that
+// vehicle's own grade list), which COMPLETE means the vehicle has reached. 350 is the EU 2.3
+// cap -- a not-genuinely-complete vehicle pushes its own (lower) max, which would understate
+// the badge under the flag.
+const FAKE_ELITE_MAX_LEVEL = 350;
 
 const observer = ModelObserver("WGModResearch");
 
@@ -57,7 +101,35 @@ const CAT_ICON = {
     // Speculative "potential Tier XI" -> the Research section glyph (the bar tracks XP
     // toward a hypothetical tier-XI research goal, so the research art reads right).
     [MODE.POTENTIAL_TIER_XI]: "img://gui/maps/icons/hangar/vehicleMenu/large/research.png",
+    // Fully Progressed -> a green checkmark. NOT the library GreenCheck_1 used for the
+    // corner done-badges: that art is 16x16 and would upscale 2.25-4.5x in the 36/54rem
+    // category box. This one is natively 110x110.
+    [MODE.COMPLETE]: "img://gui/maps/icons/personal_missions_30/common/card/done_big.png",
 };
+
+// The prestige hexagon emblem -- the closest thing to a section glyph the two elite
+// systems have (neither Elite System nor Elite Rewards ships a vehicleMenu icon, and no
+// such art exists in the packed set). Used by the COMPLETE category row below.
+const PRESTIGE_EMBLEM = "img://gui/maps/icons/prestige/emblem/72x72/prestige.png";
+
+// Icon for ONE finished-category box in the COMPLETE row: the same section glyph the
+// header shows for that mode, the vehicle's CURRENT grade emblem for Elite System when
+// the model carries one, else the generic prestige emblem.
+function completeCatIcon(mode, curEmblem) {
+    if (CAT_ICON[mode]) return CAT_ICON[mode];
+    return (mode === MODE.ELITE && curEmblem) ? curEmblem : PRESTIGE_EMBLEM;
+}
+
+// ...and which FAMILY that URL came from, as a marker class -- the two families have very
+// different alpha fills, so one shared `background-size: contain` box renders them at
+// wildly different APPARENT glyph sizes. Measured off the packed art: the vehicleMenu
+// "white" PNGs are line art in a 64x64 canvas whose glyph spans only 0.50-0.56 of it
+// (research 32x17, vehSkillTree 36x26, fieldModification 35x19), while every prestige
+// emblem fills 0.93-0.96 of its 72x72 -- a ~1.8x linear (~4x area) mismatch. The CSS
+// normalizes each family with its own background-size (see .wg-cat-fam-* ).
+function completeCatIconFam(mode) {
+    return CAT_ICON[mode] ? "wg-cat-fam-white" : "wg-cat-fam-emblem";
+}
 
 // NB: the potential-Tier-XI milestone tick's glyph / "Tier XI" caption / class-name
 // title are stamped on the Python Tick in the bridge (_decorate_potential), NOT here --
@@ -272,12 +344,18 @@ function emblemNumberHtml(level, family) {
 // level painted over it in the grade-colored emblemFont -- exactly how the vehicle
 // carousel's prestige tooltip shows it. MAX (prestige.png, no family) shows the
 // hexagon alone, no number (matches the game + the category-icon badge).
-function eliteTipIconHtml(url, level) {
-    const fam = gradeFamily(url);
+// Two optional args let the COMPLETE category tooltip reuse this verbatim instead of
+// growing a third emblem-number implementation: `extraCls` hangs a marker class on the
+// box (it re-sizes the box AND picks tipMain's layout modifier), and `famOverride`
+// forces the emblemFont family -- which also opts INTO the number for a family-less
+// emblem (the generic prestige.png a category badge uses; grade ticks pass nothing, so
+// their MAX badge stays numberless).
+function eliteTipIconHtml(url, level, extraCls, famOverride) {
+    const fam = famOverride || gradeFamily(url);
     const overlay = (fam && level > 0)
         ? '<span class="wg-tip-icon-num">' + emblemNumberHtml(level, fam) + "</span>" : "";
-    return '<div class="wg-tip-icon wg-tip-icon-elite" style="background-image:url(\'' +
-        url + '\')">' + overlay + "</div>";
+    return '<div class="wg-tip-icon wg-tip-icon-elite' + (extraCls ? " " + extraCls : "") +
+        '" style="background-image:url(\'' + url + '\')">' + overlay + "</div>";
 }
 
 // The elite level number as plain WoT-font text, matching how the garage carousel
@@ -688,7 +766,8 @@ function tipMain(iconHtml, titleHtml, bodyHtml) {
     // a plain block reserved-column always grows to its full wrapped text. Order matters:
     // the hex/elite/category icons also carry the base "wg-tip-icon" class, so test the
     // specific ones first.
-    var mod = iconHtml.indexOf("wg-tip-hex") >= 0 ? " wg-tip-main-hex"
+    var mod = iconHtml.indexOf("wg-cat-fam-") >= 0 ? " wg-tip-main-cat"
+        : iconHtml.indexOf("wg-tip-hex") >= 0 ? " wg-tip-main-hex"
         : iconHtml.indexOf("wg-tip-icon-elite") >= 0 ? " wg-tip-main-elite"
         : iconHtml.indexOf("wg-tip-icon-veh") >= 0 ? " wg-tip-main-veh"
         : iconHtml.indexOf("wg-tip-icon-reward") >= 0 ? " wg-tip-main-reward"
@@ -1032,6 +1111,77 @@ function renderNextAvailable(nextEl, arr, hotEl, spendableXp, est) {
         nextEl.style.display = "none";
     }
     if (hotEl) hotEl._wgChips = chips;
+}
+
+// COMPLETE ("Fully Progressed"): the row of FINISHED categories below the bar -- one box
+// per category (its section icon + the green corner check), each with its own nested
+// tooltip naming the category and what it cost in total. Reuses the skill-tree chip
+// machinery verbatim: the boxes carry .wg-chip (box size/spacing + the nested .wg-chip-tip
+// frame + the .wg-large restatement) and are VISUAL ONLY, with .wg-hot hit-testing them
+// through hotEl._wgChips (chipAt / setActiveChip). Nothing here is clickable -> cmd null.
+function renderCompleteCats(nextEl, arr, curEmblem, eliteLevel, hotEl) {
+    nextEl.innerHTML = "";
+    const chips = [];
+    const n = arrLen(arr);
+    for (let i = 0; i < n; i++) {
+        const u = arrGet(arr, i);
+        if (!u) continue;
+        const url = completeCatIcon(u.category, curEmblem);
+        // Same family marker on BOTH sites this icon appears (row box + tooltip), so the
+        // white/emblem size normalization is one CSS rule pair (see .wg-cat-fam-*).
+        const fam = completeCatIconFam(u.category);
+        const box = document.createElement("div");
+        box.className = "wg-chip wg-cat-done";
+        const ico = document.createElement("div");
+        // ...plus a per-MODE marker on the ROW box only (the tooltip icon keeps the family
+        // normalization alone, which reads uniform): one glyph needs a size trim its family
+        // doesn't -- see .wg-cat-m-skill_tree in the CSS.
+        ico.className = "wg-cat-done-ico " + fam + " wg-cat-m-" + u.category;
+        ico.style.backgroundImage = "url('" + url + "')";
+        // The Elite System box shows a bare hexagon, which says nothing about WHICH level
+        // was reached -- so paint the level number over the emblem, the same badge the elite
+        // header's category icon and the bar's grade ticks use. The level is the vehicle's
+        // MAX, which COMPLETE means it has reached. Resolving the family HERE (gold fallback
+        // for the family-less generic prestige.png) makes it the one truth shared by both
+        // sites the icon appears -- the row box below and the tooltip icon further down --
+        // and non-empty doubles as "this category gets a badge". ELITE only, deliberately:
+        // ELITE_REWARDS is the reward TRACK, not a grade, so a level numeral on its generic
+        // prestige emblem read as a claim about a grade it doesn't represent. It keeps the
+        // plain bgIconHtml path (the .wg-cat-fam-emblem 88% normalization still applies).
+        const eliteCat = u.category === MODE.ELITE;
+        const badgeFam = (eliteLevel > 0 && eliteCat)
+            ? emblemFontFamily(gradeFamily(url)) : "";
+        if (badgeFam) ico.appendChild(emblemNumber(eliteLevel, badgeFam));
+        box.appendChild(ico);
+        box.appendChild(doneBadge());          // the same green check the done markers use
+        const tip = document.createElement("div");
+        tip.className = "wg-chip-tip";
+        // Title = the category's own localized header (the SAME label the mode switch
+        // shows), its icon on the right, then that category's total cost. An elite
+        // category's icon carries the SAME level badge as its row box: bgIconHtml can't
+        // (it's a bare box), so the elite path goes through eliteTipIconHtml -- the
+        // string-building sibling of emblemNumber -- with `fam` kept as the extra class so
+        // the box sizing + tipMain's .wg-tip-main-cat layout still apply.
+        tip.innerHTML = joinSections([
+            tipMain(badgeFam ? eliteTipIconHtml(url, eliteLevel, fam, badgeFam)
+                             : bgIconHtml(url, fam),
+                '<div class="wg-tip-name">' + escapeHtml(modeTitle(u.category)) + "</div>"),
+            xpTotalHtml(u.xpRequired)]);
+        box.appendChild(tip);
+        nextEl.appendChild(box);
+        chips.push({ el: box, tip: tip, cmd: null, arg: undefined });
+    }
+    nextEl.style.display = chips.length ? "flex" : "none";
+    if (hotEl) hotEl._wgChips = chips;
+}
+
+// A bare XP total (a COMPLETE category's full cost) -- shaped like creditsHtml, NOT
+// xpFracHtml: there is nothing left to afford, so no have/need fraction and no battles
+// estimate. 0 / absent renders nothing (the tooltip then shows title + icon only).
+function xpTotalHtml(xp) {
+    xp = xp | 0;
+    if (xp <= 0) return "";
+    return '<div class="wg-tip-xp">' + fmtXp(xp) + xpIco(xpCurrencyIcon()) + "</div>";
 }
 
 // Build the framed perk glyph (frame ring + centered perk icon) into `box`, matching
@@ -1600,7 +1750,7 @@ function render(model) {
 
     // Elite Levels (prestige) modes own the whole header + bar (grade/reward
     // readout, single-segment fill, combat-XP star), so they branch out early.
-    if (data.mode === MODE.ELITE || data.mode === MODE.ELITE_REWARDS) {
+    if (!FORCE_COMPLETE && (data.mode === MODE.ELITE || data.mode === MODE.ELITE_REWARDS)) {
         renderElite(root, data, data.mode === MODE.ELITE_REWARDS);
         return;
     }
@@ -1612,15 +1762,18 @@ function render(model) {
     // Right-side readout stays visible in every mode (set per-mode below).
     xpEl.style.display = "flex";
 
-    const mode = data.mode;
+    const mode = FORCE_COMPLETE ? MODE.COMPLETE : data.mode;
     // Spendable XP (vehicle + free), the affordability yardstick for tooltips.
     const spendableXp = data.spendableXp | 0;
     // Inputs for the tooltip "≈ M-N battles" estimate (divisor selection + bonuses);
     // suppressed downstream when no divisor is available (no battles / unreadable).
     const battleEst = mkBattleEst(data);
-    const sMin = data.scaleMin || 0;
-    const sMax = data.scaleMax || 0;
-    const fv = data.fillVehicle || 0;
+    // ponytail: under FORCE_COMPLETE, fake a 0..1 fully-filled scale -- a real COMPLETE
+    // model is degenerate (scaleMin == scaleMax == 0, no ticks), so the bar would draw
+    // empty. Upgrade path: drop this once COMPLETE gets a real model from Python.
+    const sMin = FORCE_COMPLETE ? 0 : (data.scaleMin || 0);
+    const sMax = FORCE_COMPLETE ? 1 : (data.scaleMax || 0);
+    const fv = FORCE_COMPLETE ? 1 : (data.fillVehicle || 0);
     const ff = data.fillFree || 0;
     const span = Math.max(sMax - sMin, 1);
     const pct = (xp) => Math.max(0, Math.min(100, ((xp - sMin) / span) * 100));
@@ -1646,6 +1799,20 @@ function render(model) {
         // stay in the header row regardless.
         xp2Val.style.display = "block";
         xp2Ico.style.display = "block";
+    } else if (mode === MODE.COMPLETE) {
+        // Upper-right = the SUM of every completed category's cost (pushed as
+        // progressCurrent). setXp() can't serve it: its fill args are the fake 0..1 axis.
+        // progressRequired is 0, so setXpPct below keeps the "%" hidden -- there is
+        // nothing left for a percentage to be OF.
+        root.querySelector(".wg-xp-ico").style.backgroundImage =
+            "url('" + xpCurrencyIcon() + "')";
+        // Under the dev flag the pushed scalars belong to the REAL winner mode (this
+        // vehicle isn't genuinely complete), so they'd contradict FAKE_CATS: swap in the
+        // fake row's own sum, and zero the denominator exactly like a real COMPLETE model
+        // does (progress_required = 0) so setXpPct below keeps the "%" hidden.
+        if (FORCE_COMPLETE) { PROGRESS_CUR = FAKE_CATS_TOTAL; PROGRESS_REQ = 0; }
+        root.querySelector(".wg-xp-val").textContent = fmtXp(PROGRESS_CUR, ",");
+        hideXp2(root);
     } else {
         setXp(root, data.fillVehicle, data.fillFree);
         hideXp2(root);
@@ -1688,12 +1855,25 @@ function render(model) {
     const stTotal = data.fieldModsTotal || 0;
     const onlyFinal = mode === MODE.SKILL_TREE && stTotal > 0 &&
         stDone === stTotal - 1 && arrLen(data.availUpgrades) >= 1;
-    if (mode === MODE.SKILL_TREE && nextEl && !onlyFinal) {
-        const sig = upgradesSig(data.availUpgrades, spendableXp);
+    // COMPLETE reuses this same row (and the same rebuild guard) for its finished-category
+    // icons -- both rows live in .wg-next and are hit-tested through hotEl._wgChips. The
+    // mode is folded into the signature so a mode swap can never mistake one row's chips
+    // for the other's. NB this must run BEFORE the render path's early returns below --
+    // the `else` branch clears _wgChips, which would wipe the category row.
+    const rowMode = mode === MODE.COMPLETE || (mode === MODE.SKILL_TREE && !onlyFinal);
+    if (rowMode && nextEl) {
+        const sig = mode + ":" + upgradesSig(data.availUpgrades, spendableXp);
         if (nextEl._wgSig !== sig) {
             nextEl._wgSig = sig;
             setActiveChip(hotEl, null);
-            renderNextAvailable(nextEl, data.availUpgrades, hotEl, spendableXp, battleEst);
+            if (mode === MODE.COMPLETE) {
+                renderCompleteCats(nextEl, FAKE_CATS || data.availUpgrades,
+                                   data.eliteCurrentIcon || "",
+                                   FORCE_COMPLETE ? FAKE_ELITE_MAX_LEVEL
+                                                  : (data.eliteMaxLevel | 0), hotEl);
+            } else {
+                renderNextAvailable(nextEl, data.availUpgrades, hotEl, spendableXp, battleEst);
+            }
         } else {
             nextEl.style.display = "flex";   // unchanged -> keep chips + tooltip, re-show
         }
@@ -1710,10 +1890,11 @@ function render(model) {
     // hover handler owns visibility -- it re-reads the (rebuilt) tick metadata
     // below, so an in-place refresh just updates the data under the cursor.
 
-    // COMPLETE (nothing left to research/upgrade/unlock) -> just hide the bar; there's
-    // no localized "Fully researched" header we want to show, and an empty bar adds no
-    // information. Same for a degenerate empty scale (sMax<=sMin).
-    if (mode === MODE.COMPLETE || sMax <= sMin) {
+    // A degenerate empty scale (sMax<=sMin) has no bar to draw -> hide. COMPLETE used to be
+    // hidden here too; it now arrives with a real, fully-filled 0..1 model of its own
+    // (builder._complete_model) and renders like any other mode. The only COMPLETE model
+    // still caught here is the no-data placeholder (scale 0/0), which carries nothing to show.
+    if (sMax <= sMin) {
         root.style.display = "none";
         return;
     }
@@ -1723,10 +1904,12 @@ function render(model) {
     // upgrade carrying its icon on the rightmost tick. No per-node tooltips (the
     // tick loop below skips hover wiring for this mode). wg-skill gives the fill its
     // own steel-blue tone (.wg-skill .wg-fill-veh in CSS), distinct from tech-tree.
-    root.className = (mode === MODE.SKILL_TREE ? "wg-skill" : "") + cbClass(data) +
+    root.className = (mode === MODE.SKILL_TREE ? "wg-skill"
+        : mode === MODE.COMPLETE ? "wg-complete" : "") + cbClass(data) +
         (IGNORE_FREE_XP ? " wg-ignore-free" : "") + (SCALE_LARGE ? " wg-large" : "");
 
     label.textContent = mode === MODE.SKILL_TREE ? L("headerSkillTree", "Upgrades")
+        : mode === MODE.COMPLETE ? L("headerComplete", "Fully Progressed")
         : mode === MODE.POTENTIAL_TIER_XI ? L("capTierXI", "Tier XI")
         : mode === MODE.FIELD_MODS ? L("headerFieldMods", "Field Modifications")
         : L("headerResearch", "Research");
@@ -1747,7 +1930,9 @@ function render(model) {
     curEl.style.display = "block";
 
     const ticks = data.ticks;
-    const n = arrLen(ticks);
+    // No ticks under the forced mode -- a real COMPLETE model carries none, and the real
+    // vehicle's ticks would all clamp onto the fake 0..1 scale's right edge.
+    const n = FORCE_COMPLETE ? 0 : arrLen(ticks);
     // Skill-tree ticks carry no per-node metadata (non-linear tree) -> no hover tooltips
     // (only the named FINAL tick tips). Other modes wire every tick into the hover system.
     const noTips = mode === MODE.SKILL_TREE;
@@ -2045,7 +2230,10 @@ function ensureHover(hotEl, tipEl) {
         if (chip) {
             setActiveChip(hotEl, chip);
             tipEl.style.display = "none";
-            hotEl.style.cursor = dragMode ? "move" : "pointer";
+            // Pointer only when the box actually does something: a COMPLETE category box
+            // (and an unaffordable frontier chip) carries a null cmd -- the click handler
+            // swallows it, so it must not advertise a click either.
+            hotEl.style.cursor = dragMode ? "move" : (chip.cmd ? "pointer" : "");
             return;
         }
         setActiveChip(hotEl, null);

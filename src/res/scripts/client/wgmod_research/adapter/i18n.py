@@ -61,6 +61,7 @@ _FALLBACK = {
     "headerSkillTree": u"Upgrades",
     "headerElite": u"Elite System",
     "headerEliteRewards": u"Elite Rewards",
+    "headerComplete": u"Fully Progressed",
     # Localized "Tier XI" -- the potential-Tier-XI mode's header AND its tooltip
     # category caption (like a tech-tree next-vehicle tick's "Tier IX"). Built from the
     # game's own "Tier" label + the roman numeral (see widget_labels / tier_label).
@@ -74,6 +75,17 @@ _FALLBACK = {
     # Field-mod choice-variant separator ("... or ...").
     "sepOr": u"or",
 }
+
+
+def _complete_label():
+    """"Fully Progressed" in the client language, from the settings panel's own
+    already-translated label (see widget_labels). Guarded like every other lookup here."""
+    try:
+        from wgmod_research.adapter import settings_i18n
+        return settings_i18n.label(u"showWhenComplete") or _mark(_FALLBACK["headerComplete"])
+    except Exception:
+        LOG_CURRENT_EXCEPTION()
+        return _mark(_FALLBACK["headerComplete"])
 
 
 def widget_labels():
@@ -112,6 +124,12 @@ def widget_labels():
         lambda: _S().prestige.entryPoint.header(), _FALLBACK["headerElite"])
     out["headerEliteRewards"] = _text(
         lambda: _S().veh_skill_tree.intro.vanity.title(), _FALLBACK["headerEliteRewards"])
+    # COMPLETE header. The game has NO "Fully Progressed" string, but the settings panel
+    # already ships that exact label (its showWhenComplete toggle) with per-language
+    # translations -- reuse it rather than starting a second table. Imported LAZILY:
+    # settings_i18n imports this module, so a top-level import would be circular (by call
+    # time this module is fully loaded, so the cycle never materializes).
+    out["headerComplete"] = _complete_label()
     # Field-mod per-tick caption reuses the field-mods header (its roman numeral already
     # rides the hexagon glyph, so it's not repeated in the caption).
     out["capFieldMod"] = out["headerFieldMods"]

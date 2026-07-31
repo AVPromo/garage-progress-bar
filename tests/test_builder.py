@@ -799,3 +799,76 @@ def test_progress_readout_complete_is_zero_over_zero():
     assert m.mode == t.Mode.COMPLETE
     assert m.progress_current == 0
     assert m.progress_required == 0
+
+
+# --- COMPLETE ("Fully Progressed") with finished categories to report --------
+# The widened gate: COMPLETE no longer needs an empty candidate list -- every category
+# that APPLIES being finished is enough, and each one is reported as an avail_upgrades
+# entry (see resolvers/complete). POTENTIAL_TIER_XI and an explicit override still win.
+
+def _all_done(**kw):
+    # All five categories apply AND are finished: tech-tree edges researched, every
+    # field-mod level unlocked, skill tree fully upgraded, rewards earned, level == cap.
+    d = dict(tier=11, is_elite=True, vehicle_xp=0, free_xp=0,
+             tech_unlocks=[_u(1, 1000, researched=True),
+                           _u(99, 2000, researched=True, kind="vehicle")],
+             field_mod_steps=[_step(1, 300, unlocked=True, level=1)],
+             fieldmods_done=8, fieldmods_total=8,
+             is_skill_tree=True, skilltree_done=26, skilltree_total=26,
+             skilltree_total_xp=325000,
+             has_prestige=True, elite_level=20, elite_max_level=20,
+             elite_grades=_grades(), elite_rewards=[t.EliteReward(5, True)],
+             elite_level_xp={5: 500, 20: 9000})
+    d.update(kw)
+    return t.VehicleSnapshot(**d)
+
+
+def test_complete_is_a_full_bar_on_a_degenerate_free_axis():
+    m = build_model(_all_done())
+    assert m.mode == t.Mode.COMPLETE
+    assert (m.scale_min, m.scale_max) == (0, 1)   # a REAL 0..1 axis, not 0/0
+    assert (m.fill_vehicle, m.fill_free) == (1, 0)   # filled to the top
+    assert m.ticks == []
+
+
+def test_complete_progress_readout_is_the_summed_cost():
+    m = build_model(_all_done())
+    # 3000 tech + 325000 skill + 300 field mods + 500 rewards + 9000 elite
+    assert m.progress_current == 337800
+    assert m.progress_current == sum(u.xp_cost for u in m.avail_upgrades)
+    assert m.progress_required == 0               # nothing left to require
+
+
+def test_complete_reports_one_done_upgrade_per_finished_category():
+    m = build_model(_all_done())
+    assert [(u.category, u.xp_cost) for u in m.avail_upgrades] == [
+        (t.Mode.TECH_TREE, 3000), (t.Mode.SKILL_TREE, 325000),
+        (t.Mode.FIELD_MODS, 300), (t.Mode.ELITE_REWARDS, 500), (t.Mode.ELITE, 9000)]
+    assert all(u.done for u in m.avail_upgrades)
+
+
+def test_potential_tier_xi_still_wins_over_complete():
+    # A speculative future Tier XI is a goal AHEAD of the vehicle, not a finished
+    # category -> when it applies and is opted in it outranks COMPLETE.
+    snap = _done_tier_x(field_mod_steps=[_step(1, 100, unlocked=True, level=1)],
+                        fieldmods_done=8, fieldmods_total=8)
+    assert build_model(snap, _ALL_MODES).mode == t.Mode.COMPLETE      # sanity: gate open
+    assert build_model(snap, _WITH_PXI).mode == t.Mode.POTENTIAL_TIER_XI
+
+
+def test_override_still_wins_over_complete():
+    # The player explicitly picked an available mode -> honored on a fully-done vehicle.
+    m = build_model(_all_done(), _ALL_MODES, override=t.Mode.ELITE)
+    assert m.mode == t.Mode.ELITE
+    assert m.avail_modes == [t.Mode.ELITE]
+
+
+def test_complete_placeholder_when_no_category_applies():
+    # Unchanged legacy path: nothing applies -> the no-bar placeholder (0/0 scale, no
+    # category icons), NOT the new full bar.
+    snap = t.VehicleSnapshot(tier=8, is_elite=True, vehicle_xp=0, free_xp=0)
+    m = build_model(snap)
+    assert m.mode == t.Mode.COMPLETE
+    assert (m.scale_min, m.scale_max) == (0, 0)
+    assert m.avail_upgrades == []
+    assert m.progress_current == 0
