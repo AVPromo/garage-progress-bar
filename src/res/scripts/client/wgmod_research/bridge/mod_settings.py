@@ -7,19 +7,30 @@ _primary_api(), preferring Aslain, and if neither is present the bar simply uses
 defaults (shown everywhere) with no settings panel -- never a crash. MSA owns persistence,
 so there's no config file of our own.
 
-Master + child "show" checkboxes (all default ON = bar shown):
-- showBar          -- MASTER switch: show the whole widget (unchecked -> hide on every
-                      vehicle). The controls below are its children (greyed while it's off).
-- showWhenComplete -- keep the bar on fully-progressed (Mode.COMPLETE) vehicles.
-(These are the INVERSE polarity of the old hideAlways/hideWhenComplete flags; the net
-default behavior is unchanged. bar_visible in domain/builder.py hides when NOT showBar,
-and hides a complete vehicle when NOT showWhenComplete.)
+The panel is three named CATEGORIES, each opened by a plain Label header, laid out over TWO
+MSA columns -- "Formatting" and "Layout" share column2, split by an `Empty` spacer (see
+settings_i18n.COL1_KEYS / COL2_KEYS). A third column is deliberately NOT used: MSA only
+renders columns side-by-side when the user's global `multiColumnMode` toolbar toggle is ON
+(default OFF), and with it off Aslain folds them round-robin (i % columnCount), so a
+column3 would stack UNDER column1 instead of beside it.
 
-Plus six per-mode "show" checkboxes, all default ON (bar tier XI is the opt-in exception,
-default OFF), one per bar mode (showTechTree / showSkillTree / showFieldMods /
-showEliteRewards / showElite / showPotentialTierXI). enabled_modes() turns these into the
-set of enabled Mode strings that build_model consumes: a vehicle whose resolved mode is off
-hides the bar (no fall-through).
+- column1 "Modes"      -- the seven per-mode "show" checkboxes, all default ON (Tier XI is
+                          the opt-in exception, default OFF): showTechTree / showFieldMods /
+                          showPotentialTierXI / showSkillTree / showEliteRewards / showElite
+                          / showWhenComplete. enabled_modes() turns the first six into the
+                          set of enabled Mode strings build_model consumes -- a vehicle whose
+                          resolved mode is off hides the bar (no fall-through) -- and
+                          showWhenComplete keeps the bar on fully-progressed (Mode.COMPLETE)
+                          vehicles.
+- column2 "Formatting" -- ignoreFreeXp / showPercent / progressMode: what the bar COUNTS and
+                          how the XP readout READS. None of them gate visibility.
+- column2 "Layout"     -- after the spacer: the scale radio group, then a "Position"
+                          sub-header and the two position steppers.
+
+There is deliberately NO master switch: the seven mode checkboxes already hide the bar
+everywhere once they're all off, so a separate showBar toggle was redundant the moment the
+master became a category header. The mode checkboxes are therefore plain standalone
+controls -- no masterVarName, nothing greyed.
 
 Plus a draggable bar position, stored as two on-screen PIXEL coordinates:
 - posX -- the bar's CENTER-x in px (matches the CSS translateX(-50%) center-anchor).
@@ -60,26 +71,26 @@ except NameError:
 # typed/echoed value is clamped into [0, POS_MAX], with 0 meaning "auto / unseeded".
 POS_MAX = 20000
 
-DEFAULTS = {# showBar is the MASTER switch (default ON = bar shown everywhere). showWhenComplete
-            # (default ON) keeps the bar on fully-progressed vehicles. Both are the INVERSE of
-            # the old hideAlways/hideWhenComplete flags -- same net default behavior (bar shown,
-            # shown-when-complete), opposite polarity. See bar_visible in domain/builder.py.
-            "showBar": True, "showWhenComplete": True,
+DEFAULTS = {# showWhenComplete (default ON) keeps the bar on fully-progressed vehicles -- the
+            # INVERSE of the old hideWhenComplete flag, same net default behavior. See
+            # bar_visible in domain/builder.py.
+            "showWhenComplete": True,
             # "Ignore Free XP" -- opt-in (default off): count only the combat XP earned on
             # each vehicle toward its progress, dropping the account-global free XP from the
             # bar, affordability, and tooltips (see domain.builder.build_model ignore_free_xp).
             "ignoreFreeXp": False,
-            # Bar scale (Dropdown, 0-based int index -- Aslain MSA stores/returns the
-            # selection as an integer): 0 = Default (byte-for-byte the current rendering),
-            # 1 = Large (~2x bar width, 1.5x track/font/icon dims). scale() reads it back;
-            # the widget folds the .wg-large override class when it's 1. Coerced by
-            # _clamp_index (an out-of-range/non-int value -> 0). Lives in column2, above
-            # the Bar position controls (see _template + settings_i18n scale options).
+            # Bar scale (inline RadioButtonGroup, 0-based int index -- Aslain MSA
+            # stores/returns the selection as an integer, same value shape a Dropdown had):
+            # 0 = Default (byte-for-byte the current rendering), 1 = Large (~2x bar width,
+            # 1.5x track/font/icon dims). scale() reads it back; the widget folds the
+            # .wg-large override class when it's 1. Coerced by _clamp_index (an
+            # out-of-range/non-int value -> 0). Lives in the "Layout" group at the end of
+            # column2, above the Position controls (see _template + settings_i18n options).
             "scale": 0,
             # XP readout display controls (opt-in, view-only -- neither touches the
-            # domain model). "progressMode" (Dropdown, 0-based index): 0 = Current (show
-            # only the current XP figure, as today), 1 = Current / Required (show
-            # "current / required"). Coerced by _clamp_index. "showPercent"
+            # domain model). "progressMode" (inline RadioButtonGroup, 0-based index):
+            # 0 = Current (show only the current XP figure, as today), 1 = Current /
+            # Required (show "current / required"). Coerced by _clamp_index. "showPercent"
             # (CheckBox, default off): prepend a progress percentage to the LEFT of the
             # readout, independent of progressMode; the widget derives it as
             # min(100, round(current/required*100)) and hides it when required <= 0.
@@ -145,33 +156,51 @@ _settings = dict(DEFAULTS)
 _registered = False
 
 
-def _child(t, var):
-    """A CheckBox bound as a CHILD of the showBar master. Aslain's createControlsGroup
-    just sets a `masterVarName` key on each child (its docstring: "you can also set that key
-    by hand instead of using this helper") -- so we set it inline, keeping _template() a pure
-    dict (unit-testable, no gui.aslainMenu import, and harmless under izeberg / pytest where
-    the key is simply ignored). While showBar is unchecked, Aslain greys + disables every
-    child; bar_visible independently hides the bar (they stay consistent). No `masterIndent`
-    key means the children render INDENTED (createControlsGroup's default), the visual nest."""
+def _mode(t, var):
+    """One of the seven "Modes" CheckBoxes (column1). Plain and standalone -- deliberately
+    NO `masterVarName`: with the old showBar master gone (its slot is now the "Modes"
+    category header), these are no longer children of anything, so Aslain greys nothing and
+    they all stay live. Kept as a helper purely to avoid repeating the identical dict seven
+    times; _template() stays a pure dict (unit-testable, no gui.aslainMenu import)."""
     return {
         "type": "CheckBox",
         "text": t[var]["text"],
         "value": DEFAULTS[var],
         "tooltip": t[var]["tooltip"],
         "varName": var,
-        "masterVarName": "showBar",
     }
 
 
+def _label(t, key):
+    """A category header / sub-header row: an inert `Label`, the same component the old
+    "Bar position" caption already used. The three category headers carry no tooltip at all
+    (settings_i18n has no _TOOLTIPS_EN entry for them), so the key is only emitted when the
+    rendered text actually has one -- the "position" sub-header does.
+
+    Category headers arrive from settings_i18n ALREADY wrapped in `<b>...</b>` -- the wrap
+    lives in render_panel so this template and _sync_template_text see the identical string
+    (wrapping here instead would make every init strip the bold back out and re-save). We
+    only set `useHTML` for them: MSA's AS3 side defaults it True, but since this template is
+    a plain dict rather than a templates.createLabel() call we're leaning on that default
+    rather than the Python helper's documented one -- so state it explicitly."""
+    row = {"type": "Label", "text": t[key]["text"]}
+    if key in settings_i18n.HEADER_KEYS:
+        row["useHTML"] = True
+    tip = t[key].get("tooltip")
+    if tip is not None:
+        row["tooltip"] = tip
+    return row
+
+
 def _template():
-    """The MSA panel descriptor. A showBar MASTER checkbox (default True so a fresh install
-    shows the bar everywhere) with the six per-mode toggles + showWhenComplete nested under it
-    as children (greyed while showBar is off), then ignoreFreeXp as a STANDALONE checkbox last
-    in column1 (NOT a child -- it changes which XP counts, not whether the bar shows, so it
-    stays live when the master is off), plus the draggable-position fields in column2: two
-    numeric px steppers. The steppers show 0 until the widget seeds them from the live layout
-    on the first hangar mount. Reset is the panel's own per-mod reset button (see _on_reset),
-    so there is no custom reset control here.
+    """The MSA panel descriptor: three named CATEGORIES over TWO columns, each opened by an
+    inert Label header. column1 "Modes" = the seven per-mode checkboxes (plain standalone
+    controls -- no master, nothing greyed). column2 = "Formatting" (ignoreFreeXp,
+    showPercent, progressMode -- what the bar counts / how the readout reads), then an
+    `Empty` spacer, then "Layout" (the scale radio group, a "Position" sub-header and the two
+    numeric px steppers). The steppers show 0 until the widget seeds them from the live
+    layout on the first hangar mount. Reset is the panel's own per-mod reset button (see
+    _on_reset), so there is no custom reset control here.
 
     Every visible label/tooltip is pulled from settings_i18n.panel_text() at the CLIENT's
     active language (English fallback per key). The control STRUCTURE (types, varNames,
@@ -204,32 +233,62 @@ def _template():
         # Bumped 7 -> 8 when the "progressMode" Dropdown (column2) + "showPercent"
         # CheckBox (column1) were added -- two new varNames + a new option-bearing
         # control, so the bump is mandatory to reach an existing install.
-        # Bumped 8 -> 9 when "showPercent" was MOVED from column1 to column2 (directly
-        # under progressMode) -- re-parenting a control between columns is a layout
-        # change, so MSA must re-register for an existing install to see the move.
-        "settingsVersion": 9,
+        # Bumped 8 -> 9 when "showPercent" was MOVED from column1 to column2, on the
+        # belief that re-parenting a control between columns is a structural change.
+        # CORRECTION -- that bump was NOT necessary, and the comments above it (and the
+        # 5 -> 6 one) overstate what "structural" means. Verified against the Aslain MSA
+        # 1.6.4 api.pyc: setModTemplate (api.py:212-227) compares the OLD and NEW
+        # templates by _settingsStructure (api.py:667-683), which is a SORTED FLAT LIST of
+        # (varName, type, domain) collected across all four columns. Column identity,
+        # ordering, masterVarName, labels, tooltips and a control's default `value` are
+        # ABSENT from that signature -- so re-parenting, re-ordering, or moving a control
+        # between columns takes the in-place else-branch, which swaps the stored template
+        # while PRESERVING the saved values. No bump, no wipe. Only these are structural:
+        # ADDING or REMOVING a varName, changing a control's `type`, changing a slider's
+        # min/max/snapInterval, or changing a Dropdown/RadioButtonGroup's option LABELS.
+        # Don't bump gratuitously -- every bump costs a values wipe that init() then has
+        # to migrate back (see the merge-forward code below).
+        # Bumped 9 -> 10 when the panel was restructured into three named categories and
+        # the "showBar" master was REMOVED. The re-grouping itself (controls redistributed
+        # across columns, masterVarName dropped) would need no bump per the correction
+        # above -- but REMOVING the showBar varName does, so this one is mandatory.
+        # Open question, deliberately left unresolved: whether the varName-LESS rows this
+        # layout adds (the three `Label` headers and the `Empty` spacer) enter
+        # _settingsStructure's signature at all -- the tuple is keyed on varName, but it
+        # wasn't verified whether such components are collected or filtered out first. If
+        # they ARE collected, adding them is itself structural. Moot here (the showBar
+        # removal already forces the bump); worth pinning down before shipping a layout
+        # change that adds ONLY Label/Empty rows and nothing else.
+        # Bumped 10 -> 11 when "scale" and "progressMode" became inline RadioButtonGroups
+        # instead of Dropdowns. A control's `type` IS the second element of
+        # _settingsStructure's (varName, type, domain) tuple, so this one is genuinely
+        # structural: without the bump setModTemplate takes the warn-and-keep-STORED branch
+        # and the radios would never appear. (v10 also already reached the local dev
+        # client, so its stored state sits at 10 -- keeping 10 would make every redeploy a
+        # silent no-op.) The accompanying value reset is harmless here: the index semantics
+        # are unchanged (0/1 mean exactly what they did as Dropdown indices), and init()'s
+        # merge-forward migration carries the user's choice across anyway.
+        "settingsVersion": 11,
         "column1": [
-            # MASTER: the whole-bar switch. Its children (below) grey out when it's off.
-            {
-                "type": "CheckBox",
-                "text": t["showBar"]["text"],
-                "value": DEFAULTS["showBar"],
-                "tooltip": t["showBar"]["tooltip"],
-                "varName": "showBar",
-            },
-            # Children -- order per spec: Research, Field Modifications, Tier XI, Upgrades,
-            # Elite Rewards, Elite System, Fully Progressed.
-            _child(t, "showTechTree"),
-            _child(t, "showFieldMods"),
-            _child(t, "showPotentialTierXI"),
-            _child(t, "showSkillTree"),
-            _child(t, "showEliteRewards"),
-            _child(t, "showElite"),
-            _child(t, "showWhenComplete"),
-            # STANDALONE (not a child of showBar): ignoreFreeXp changes WHICH XP counts
-            # toward progress, not WHETHER the bar shows -- so it stays live even when the
-            # master is off, and carries NO masterVarName. Placed last in column1, after
-            # the showBar group. Its default (False) and varName are unchanged.
+            # CATEGORY "Modes" -- the seven per-mode toggles, order per spec: Research,
+            # Field Modifications, Tier XI, Upgrades, Elite Rewards, Elite System, Fully
+            # Progressed. All standalone (see _mode): with the old showBar master gone,
+            # turning all seven off is what hides the bar everywhere.
+            _label(t, "modes"),
+            _mode(t, "showTechTree"),
+            _mode(t, "showFieldMods"),
+            _mode(t, "showPotentialTierXI"),
+            _mode(t, "showSkillTree"),
+            _mode(t, "showEliteRewards"),
+            _mode(t, "showElite"),
+            _mode(t, "showWhenComplete"),
+        ],
+        "column2": [
+            # CATEGORY "Formatting" -- what the bar COUNTS and how the readout READS.
+            # None of these gate visibility.
+            _label(t, "formatting"),
+            # ignoreFreeXp changes WHICH XP counts toward progress, not WHETHER the bar
+            # shows. Its default (False) and varName are unchanged.
             {
                 "type": "CheckBox",
                 "text": t["ignoreFreeXp"]["text"],
@@ -237,35 +296,6 @@ def _template():
                 "tooltip": t["ignoreFreeXp"]["tooltip"],
                 "varName": "ignoreFreeXp",
             },
-        ],
-        "column2": [
-            # Bar scale selector -- a Dropdown ABOVE the Bar position controls. Aslain's
-            # 1.6.4 shape: value = the current 0-based index, options = a list of
-            # {"label": <text>}. The label / option labels / tooltip all follow the client
-            # language (settings_i18n.panel_text() attaches the localized option labels on
-            # t["scale"]["options"], sourced from the _SCALE_OPTIONS table there).
-            {
-                "type": "Dropdown",
-                "text": t["scale"]["text"],
-                "value": DEFAULTS["scale"],
-                "options": [{"label": lbl} for lbl in t["scale"]["options"]],
-                "tooltip": t["scale"]["tooltip"],
-                "varName": "scale",
-            },
-            # Progress-mode selector -- a Dropdown ABOVE the Bar position controls: 0 =
-            # Current, 1 = Current / Required. Same Aslain 1.6.4 shape as the scale
-            # dropdown (value = current index, options = localized {"label"} list).
-            {
-                "type": "Dropdown",
-                "text": t["progressMode"]["text"],
-                "value": DEFAULTS["progressMode"],
-                "options": [{"label": lbl} for lbl in t["progressMode"]["options"]],
-                "tooltip": t["progressMode"]["tooltip"],
-                "varName": "progressMode",
-            },
-            # showPercent sits directly beneath progressMode -- both govern what the XP
-            # readout shows. NOT a child of showBar (a display tweak, not a visibility
-            # gate), so it carries NO masterVarName and stays live when the master is off.
             {
                 "type": "CheckBox",
                 "text": t["showPercent"]["text"],
@@ -273,11 +303,51 @@ def _template():
                 "tooltip": t["showPercent"]["tooltip"],
                 "varName": "showPercent",
             },
+            # Progress-mode selector: 0 = Current, 1 = Current / Required. An INLINE
+            # RadioButtonGroup -- both options visible as one horizontal row
+            # ([x] Current  [ ] Current / Required) instead of a collapsed Dropdown. Its
+            # value shape is IDENTICAL to a Dropdown's (the 0-based index into `options`),
+            # so _clamp_index / progress_mode() / the widget wire are untouched.
+            # `inline` needs MSA >= 1.6.1 (we bundle 1.6.4); because this template is a
+            # plain dict rather than a templates.createRadioButtonGroup() call, an older
+            # MSA just ignores the unknown key and renders a vertical stack -- degrades
+            # cleanly, so no feature detection is needed. settings_i18n.panel_text()
+            # attaches the localized option pair on t["progressMode"]["options"] (from the
+            # _PROGRESS_OPTIONS table there).
             {
-                "type": "Label",
-                "text": t["barPosition"]["text"],
-                "tooltip": t["barPosition"]["tooltip"],
+                "type": "RadioButtonGroup",
+                "text": t["progressMode"]["text"],
+                "value": DEFAULTS["progressMode"],
+                "options": [{"label": lbl} for lbl in t["progressMode"]["options"]],
+                "inline": True,
+                "tooltip": t["progressMode"]["tooltip"],
+                "varName": "progressMode",
             },
+            # Breathing room between the two groups sharing this column (20px is Aslain's
+            # own createEmpty default). It carries no text, so settings_i18n.COL2_KEYS
+            # holds a SPACER sentinel in this slot to keep the positional walk aligned.
+            {"type": "Empty", "height": 20},
+            # CATEGORY "Layout" -- on-screen size, then the position sub-section. Merged
+            # into column2 rather than a column3 of its own: a third column only renders
+            # side-by-side when the user's global MSA `multiColumnMode` toolbar toggle is
+            # ON (default OFF); with it off Aslain folds columns round-robin
+            # (i % columnCount), so column3 would stack UNDER column1.
+            _label(t, "layout"),
+            # Bar scale selector -- same inline RadioButtonGroup shape as progressMode
+            # above (0-based index value, MSA >= 1.6.1 for `inline`); its option labels
+            # come from settings_i18n's _SCALE_OPTIONS table.
+            {
+                "type": "RadioButtonGroup",
+                "text": t["scale"]["text"],
+                "value": DEFAULTS["scale"],
+                "options": [{"label": lbl} for lbl in t["scale"]["options"]],
+                "inline": True,
+                "tooltip": t["scale"]["tooltip"],
+                "varName": "scale",
+            },
+            # Sub-header for the two steppers (this Label DOES carry a tooltip -- it's the
+            # one place the Ctrl+drag hint lives).
+            _label(t, "position"),
             {
                 "type": "NumericStepper",
                 "text": t["posX"]["text"],
@@ -615,12 +685,6 @@ def set_position(x, y, w=0, h=0):
         B.refresh()
     except Exception:
         LOG_CURRENT_EXCEPTION()
-
-
-def show_bar():
-    """Master switch: True -> the bar may render (default); False -> hidden everywhere.
-    Inverse polarity of the old hide_always(). bar_visible hides when NOT show_bar."""
-    return _settings["showBar"]
 
 
 def show_when_complete():

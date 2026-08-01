@@ -36,10 +36,10 @@ def test_on_changed_ignores_foreign_linkage():
 
 
 def test_on_changed_ignores_foreign_linkage_flags():
-    # Same guard for the boolean flags: a sibling mod can't flip our showBar etc.
-    mod_settings._settings["showBar"] = True
-    mod_settings._on_changed(_FOREIGN_LINKAGE, {"showBar": False})
-    assert mod_settings._settings["showBar"] is True
+    # Same guard for the boolean flags: a sibling mod can't flip our showWhenComplete etc.
+    mod_settings._settings["showWhenComplete"] = True
+    mod_settings._on_changed(_FOREIGN_LINKAGE, {"showWhenComplete": False})
+    assert mod_settings._settings["showWhenComplete"] is True
 
 
 def test_on_changed_applies_own_linkage():
@@ -54,6 +54,6 @@ def test_on_changed_applies_own_linkage():
 
 def test_on_changed_applies_own_linkage_flags():
     # A real flag change on our own linkage still lands.
-    mod_settings._settings["showBar"] = True
-    mod_settings._on_changed(mod_settings.LINKAGE, {"showBar": False})
-    assert mod_settings._settings["showBar"] is False
+    mod_settings._settings["showWhenComplete"] = True
+    mod_settings._on_changed(mod_settings.LINKAGE, {"showWhenComplete": False})
+    assert mod_settings._settings["showWhenComplete"] is False

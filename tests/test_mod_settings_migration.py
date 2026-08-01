@@ -118,13 +118,14 @@ def _run_init_with(api):
 # --- migration (settingsVersion bump) ---------------------------------------
 
 def test_migration_preserves_user_values_drops_removed_key_and_seeds_new_default():
-    # A stored dict at an OLD settingsVersion with non-default user values, one legacy key
-    # that no longer exists in the template, and NO 'progressMode' (a key that only exists
-    # in the newer template) -- so migration must keep the survivors, drop the legacy key,
-    # and leave progressMode at its fresh default.
+    # A stored dict at an OLD settingsVersion with non-default user values, two legacy keys
+    # that no longer exist in the template ('showBar', the real one dropped in the
+    # three-category restructure, plus a synthetic one), and NO 'progressMode' (a key that
+    # only exists in the newer template) -- so migration must keep the survivors, drop the
+    # legacy keys, and leave progressMode at its fresh default.
     old = {
         "enabled": True,
-        "showBar": True,
+        "showBar": True,                # removed in the three-category restructure
         "showWhenComplete": True,
         "scale": 1,
         "ignoreFreeXp": True,
@@ -144,8 +145,9 @@ def test_migration_preserves_user_values_drops_removed_key_and_seeds_new_default
     assert M._settings["showTechTree"] is False
     # A key only in the NEW template (not in the old dict) takes its fresh default.
     assert M.progress_mode() == M.DEFAULTS["progressMode"]
-    # The removed legacy key is gone (never leaks into our cache).
+    # The removed legacy keys are gone (never leak into our cache).
     assert "legacyGoneVarName" not in M._settings
+    assert "showBar" not in M._settings
     # Persisted exactly once (the reset + overlay coalesce into one debounced write).
     assert api.updated == 1
     assert api.saved == 1
@@ -161,7 +163,7 @@ def test_migration_preserves_user_values_drops_removed_key_and_seeds_new_default
 def test_migration_preserves_host_enabled_false():
     # If the user disabled the mod via Aslain's host 'enabled' toggle, migration must not
     # silently re-enable it -- the host key survives the template reset and the re-write.
-    old = {"enabled": False, "showBar": True, "scale": 1}
+    old = {"enabled": False, "showWhenComplete": True, "scale": 1}
     api = _FakeMsaApi(stored=old, stored_version=8)
     _run_init_with(api)
     assert api.state["settings"][M.LINKAGE]["enabled"] is False
@@ -190,7 +192,7 @@ def test_same_version_path_applies_stored_and_does_not_migrate():
     # getModSettings returns the stored dict (version matches) -> the saved-truthy branch
     # runs: _apply(saved) + registerCallback, and the migration/setModTemplate else-branch
     # is never entered (no template reset, no migration write).
-    stored = {"enabled": True, "showBar": True, "scale": 1, "ignoreFreeXp": True,
+    stored = {"enabled": True, "scale": 1, "ignoreFreeXp": True,
               "posX": 700, "posY": 300}
     api = _FakeMsaApi(stored=stored, stored_version=M._template()["settingsVersion"])
     _run_init_with(api)

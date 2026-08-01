@@ -70,23 +70,24 @@ works, troubleshooting, and uninstalling.
 
 With **ModsSettingsAPI** installed, the mod's options appear in the **Modification
 list** window that ModsSettingsAPI adds. Without it the bar simply shows everywhere
-with the defaults and no options. The controls, in panel order:
+with the defaults and no options. The controls sit in three categories:
 
-| Setting | Default | What it does |
-| --- | --- | --- |
-| **Show Progress Bar** | On | Master switch. Uncheck to hide the bar on every vehicle; the six mode toggles and **Fully Progressed** are its children and grey out while it's off. |
-| ↳ **Research** | On | Shows the bar on vehicles researching tech-tree modules and successors. |
-| ↳ **Field Modifications** | On | Shows the bar on vehicles progressing Field Modifications. |
-| ↳ **Tier XI** | Off | Opt-in — shows the speculative Potential Tier XI projection. |
-| ↳ **Upgrades** | On | Shows the bar on tier-XI vehicles spending XP on the skill tree. |
-| ↳ **Elite Rewards** | On | Shows the bar while an Elite Level reward is still to unlock. |
-| ↳ **Elite System** | On | Shows the bar for Elite Level (prestige) progress. |
-| ↳ **Fully Progressed** | On | Keeps the bar on vehicles with nothing left to research, upgrade, or unlock. Uncheck to hide it once a vehicle is fully progressed. |
-| **Ignore Free XP** | Off | Counts only the combat XP you earn on each vehicle, dropping account-wide Free XP from the bar, totals, and tooltips. |
-| **Scale** | Default | Large roughly doubles the bar's width and enlarges its text, icons, and tooltip. |
-| **Progress Mode** | Current | What the XP readout shows — just the XP you have so far, or Current / Required. |
-| **Show Progress %** | Off | Prepends a progress percentage to the XP readout. |
-| **Bar position** | Auto | Ctrl+drag the bar in the Garage to move it, or type exact on-screen pixel coordinates (**Horizontal (center X)** / **Vertical (top Y)**). The panel's per-mod reset returns it to the automatic default. |
+| Category | Setting | Default | What it does |
+| --- | --- | --- | --- |
+| **Modes** | **Research** | On | Shows the bar on vehicles researching tech-tree modules and successors. |
+| | **Field Modifications** | On | Shows the bar on vehicles progressing Field Modifications. |
+| | **Tier XI** | Off | Opt-in — shows the speculative Potential Tier XI projection. |
+| | **Upgrades** | On | Shows the bar on tier-XI vehicles spending XP on the skill tree. |
+| | **Elite Rewards** | On | Shows the bar while an Elite Level reward is still to unlock. |
+| | **Elite System** | On | Shows the bar for Elite Level (prestige) progress. |
+| | **Fully Progressed** | On | Keeps the bar on vehicles with nothing left to research, upgrade, or unlock. Uncheck to hide it once a vehicle is fully progressed. |
+| **Formatting** | **Ignore Free XP** | Off | Counts only the combat XP you earn on each vehicle, dropping account-wide Free XP from the bar, totals, and tooltips. |
+| | **Show Progress %** | Off | Prepends a progress percentage to the XP readout. |
+| | **Progress Mode** | Current | What the XP readout shows — just the XP you have so far, or Current / Required. |
+| **Layout** | **Scale** | Default | Large roughly doubles the bar's width and enlarges its text, icons, and tooltip. |
+| | **Position** | Auto | Ctrl+drag the bar in the Garage to move it, or type exact on-screen pixel coordinates (**Horizontal (center X)** / **Vertical (top Y)**). The panel's per-mod reset returns it to the automatic default. |
+
+Turning every **Modes** toggle off hides the bar on every vehicle.
 
 ## Notes & limitations
 
@@ -192,23 +193,24 @@ Building, deploying, testing, and the repo layout are documented in
 
 Зі встановленим **ModsSettingsAPI** параметри мода з'являються у вікні **Список
 модифікацій**, яке додає ModsSettingsAPI. Без нього смуга просто показується скрізь зі
-значеннями за замовчуванням і без параметрів. Параметри в порядку панелі:
+значеннями за замовчуванням і без параметрів. Параметри згруповані в три категорії:
 
-| Параметр | За замовчуванням | Що робить |
-| --- | --- | --- |
-| **Показувати смугу прогресу** | Увімк. | Головний перемикач. Зніміть позначку, щоб приховати смугу на всій техніці; шість перемикачів режимів і **Повністю пройдено** є його дочірніми й стають неактивними, коли він вимкнений. |
-| ↳ **Дослідження** | Увімк. | Показує смугу на техніці, що досліджує модулі та наступників у дереві. |
-| ↳ **Польові модифікації** | Увімк. | Показує смугу на техніці, що проходить польові модифікації. |
-| ↳ **XI рівень** | Вимк. | Опційно — показує проекцію потенційного XI рівня. |
-| ↳ **Вдосконалення** | Увімк. | Показує смугу на техніці XI рівня, що витрачає досвід у дереві навичок. |
-| ↳ **Елітні нагороди** | Увімк. | Показує смугу, поки є нагорода елітного рівня, яку ще не відкрито. |
-| ↳ **Елітна система** | Увімк. | Показує смугу для прогресу елітних рівнів (престижу). |
-| ↳ **Повністю пройдено** | Увімк. | Лишає смугу на техніці, де вже нічого досліджувати, вдосконалювати чи відкривати. Зніміть позначку, щоб ховати її після повного проходження. |
-| **Ігнорувати вільний досвід** | Вимк. | Враховує лише бойовий досвід, зароблений на кожній техніці, виключаючи загальний вільний досвід зі смуги, підсумків і підказок. |
-| **Масштаб** | За замовчуванням | «Великий» приблизно вдвічі збільшує ширину смуги та збільшує її текст, іконки й підказку. |
-| **Режим прогресу** | Поточний | Що показує лічильник досвіду — лише наявний досвід чи «Поточний / Потрібно». |
-| **Показувати прогрес у %** | Вимк. | Додає відсоток прогресу перед лічильником досвіду. |
-| **Розташування смуги** | Автоматично | Ctrl+перетягніть смугу в Ангарі, щоб перемістити її, або введіть точні екранні координати в пікселях (**По горизонталі (центр X)** / **По вертикалі (верх Y)**). Скидання мода в панелі повертає її в автоматичне положення. |
+| Категорія | Параметр | За замовчуванням | Що робить |
+| --- | --- | --- | --- |
+| **Режими** | **Дослідження** | Увімк. | Показує смугу на техніці, що досліджує модулі та наступників у дереві. |
+| | **Польові модифікації** | Увімк. | Показує смугу на техніці, що проходить польові модифікації. |
+| | **XI рівень** | Вимк. | Опційно — показує проекцію потенційного XI рівня. |
+| | **Вдосконалення** | Увімк. | Показує смугу на техніці XI рівня, що витрачає досвід у дереві навичок. |
+| | **Елітні нагороди** | Увімк. | Показує смугу, поки є нагорода елітного рівня, яку ще не відкрито. |
+| | **Елітна система** | Увімк. | Показує смугу для прогресу елітних рівнів (престижу). |
+| | **Повністю пройдено** | Увімк. | Лишає смугу на техніці, де вже нічого досліджувати, вдосконалювати чи відкривати. Зніміть позначку, щоб ховати її після повного проходження. |
+| **Форматування** | **Ігнорувати вільний досвід** | Вимк. | Враховує лише бойовий досвід, зароблений на кожній техніці, виключаючи загальний вільний досвід зі смуги, підсумків і підказок. |
+| | **Показувати прогрес у %** | Вимк. | Додає відсоток прогресу перед лічильником досвіду. |
+| | **Режим прогресу** | Поточний | Що показує лічильник досвіду — лише наявний досвід чи «Поточний / Потрібно». |
+| **Розташування** | **Масштаб** | За замовчуванням | «Великий» приблизно вдвічі збільшує ширину смуги та збільшує її текст, іконки й підказку. |
+| | **Позиція** | Автоматично | Ctrl+перетягніть смугу в Ангарі, щоб перемістити її, або введіть точні екранні координати в пікселях (**По горизонталі (центр X)** / **По вертикалі (верх Y)**). Скидання мода в панелі повертає її в автоматичне положення. |
+
+Якщо вимкнути всі перемикачі в категорії **Режими**, смуга не показуватиметься на жодній техніці.
 
 ## Примітки та обмеження
 

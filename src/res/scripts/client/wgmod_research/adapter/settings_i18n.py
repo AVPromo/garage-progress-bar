@@ -10,12 +10,16 @@ Scope, deliberately narrow:
      Rewards, Tier XI) — the per-mode checkbox labels reuse WG's own localized strings via
      ``i18n.widget_labels()`` (``FEATURE_WG`` maps each checkbox → its widget-labels key),
      so they match the game exactly in every language and never drift.
-  2. **Mod-invented labels** (the ``showBar`` master toggle, the ``showWhenComplete`` and
-     ``ignoreFreeXp`` toggles, the "Bar position" section Label, the two position steppers) —
-     bundled ``{lang: {key: label}}`` tables here, English master + per-key fallback.
+  2. **Mod-invented labels** (the three category-header Labels "Modes"/"Formatting"/
+     "Layout", the ``showWhenComplete`` and ``ignoreFreeXp`` toggles, the "Position" section
+     Label, the two position steppers) — bundled ``{lang: {key: label}}`` tables here,
+     English master + per-key fallback.
 * **Tooltips are NOT localized.** Every control's tooltip (header + body) is fixed English
   (``_TOOLTIPS_EN``) — it's explanatory help, not a setting, and has no WG string to reuse.
-  It is never translated and never routed through i18n.
+  It is never translated and never routed through i18n. The three category headers are the
+  one exception to "every control has a tooltip": they are inert section captions, so they
+  carry NO ``_TOOLTIPS_EN`` entry and ``render_panel`` simply omits the ``tooltip`` key for
+  them (rather than inventing filler prose).
 
 Everything is PURE except ``client_language()`` (the one guarded
 ``helpers.getClientLanguage()`` read) and ``panel_text()`` (which pulls the WG labels from
@@ -55,17 +59,34 @@ _FEATURE_EN = {
     u"showPotentialTierXI": u"Tier XI",
 }
 
+# Placeholder for a template row that carries NO text of its own -- currently the `Empty`
+# spacer between the Formatting and Layout groups in column2. _sync_template_text zips
+# these key tuples against the STORED components POSITIONALLY, so a textless row must still
+# occupy a slot: without it every key after the spacer would shift by one and silently
+# relabel the wrong controls. A module-level sentinel (not a bare None literal) so the
+# intent reads at the call site. Both consumers skip it -- see render_panel below and
+# mod_settings._sync_template_text (its ``t.get(key)`` yields None -> continue).
+SPACER = None
+
+# The three CATEGORY header Labels. Rendered BOLD (see render_panel) so they read as
+# section captions above their controls; the "position" sub-header is deliberately NOT
+# here -- it sits a level below the categories, and bolding it too would flatten the
+# hierarchy the spacer and headers exist to create.
+HEADER_KEYS = frozenset((u"modes", u"formatting", u"layout"))
+
 # Ordered key lists per column -- the wire order of the controls in ``_template()``. Used
-# by mod_settings to walk a stored template in lockstep (Labels carry no varName).
-# showBar is the MASTER checkbox; the six per-mode toggles and showWhenComplete are its
-# greyed-when-off children, then ignoreFreeXp is a STANDALONE control last in column1 (not
-# bound to the master -- see mod_settings._template()). The order here MUST match the wire
-# order of the controls in _template() column1 (Aslain's master-group returns a flat
-# [master, ...children] list -- no Label rows any more).
-COL1_KEYS = (u"showBar", u"showTechTree", u"showFieldMods", u"showPotentialTierXI",
-             u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete",
-             u"ignoreFreeXp")
-COL2_KEYS = (u"scale", u"progressMode", u"showPercent", u"barPosition", u"posX", u"posY")
+# by mod_settings to walk a stored template in lockstep (Label/Empty rows carry no varName).
+# The panel is three named CATEGORIES opened by Label headers ("modes" / "formatting" /
+# "layout"), but only TWO columns: Layout is merged into column2 under a spacer, because a
+# third column only renders side-by-side when the user's global MSA `multiColumnMode`
+# toolbar toggle is ON (default OFF) -- with it off Aslain folds columns round-robin
+# (i % columnCount) and column3 would stack UNDER column1 instead. The seven mode
+# checkboxes are plain standalone controls (no master switch any more -- see
+# mod_settings._template()). The order here MUST match the wire order in _template().
+COL1_KEYS = (u"modes", u"showTechTree", u"showFieldMods", u"showPotentialTierXI",
+             u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete")
+COL2_KEYS = (u"formatting", u"ignoreFreeXp", u"showPercent", u"progressMode",
+             SPACER, u"layout", u"scale", u"position", u"posX", u"posY")
 
 
 def _norm(code):
@@ -87,127 +108,153 @@ def _norm(code):
 
 
 # --- MOD-INVENTED LABELS (hand-translated) --------------------------------------------
-# Only labels -- these controls' tooltips are the fixed English in _TOOLTIPS_EN. The six
-# per-mode checkboxes are NOT here (their labels come from WG via FEATURE_WG).
+# Only labels -- these controls' tooltips are the fixed English in _TOOLTIPS_EN (the three
+# category headers carry none at all). The six per-mode checkboxes are NOT here (their
+# labels come from WG via FEATURE_WG). "modes"/"formatting"/"layout" are the three category
+# header Labels, one per column; "position" is the sub-header above the two steppers.
 _LABELS = {
     u"en": {
-        u"showBar": u"Show Progress Bar",
+        u"modes": u"Modes",
+        u"formatting": u"Formatting",
+        u"layout": u"Layout",
         u"showWhenComplete": u"Fully Progressed",
         u"ignoreFreeXp": u"Ignore Free XP",
         u"showPercent": u"Show Progress %",
         u"progressMode": u"Progress Mode",
         u"scale": u"Scale",
-        u"barPosition": u"Bar position (px)",
+        u"position": u"Position (px)",
         u"posX": u"Horizontal (center X)",
         u"posY": u"Vertical (top Y)",
     },
     u"de": {
-        u"showBar": u"Fortschrittsleiste anzeigen",
+        u"modes": u"Modi",
+        u"formatting": u"Formatierung",
+        u"layout": u"Layout",
         u"showWhenComplete": u"Vollständig fortgeschritten",
         u"ignoreFreeXp": u"Freie Erfahrung ignorieren",
         u"showPercent": u"Fortschritt in % anzeigen",
         u"progressMode": u"Fortschrittsmodus",
         u"scale": u"Skalierung",
-        u"barPosition": u"Leistenposition (px)",
+        u"position": u"Position (px)",
         u"posX": u"Horizontal (Mitte X)",
         u"posY": u"Vertikal (oben Y)",
     },
     u"fr": {
-        u"showBar": u"Afficher la barre de progression",
+        u"modes": u"Modes",
+        u"formatting": u"Mise en forme",
+        u"layout": u"Disposition",
         u"showWhenComplete": u"Entièrement progressé",
         u"ignoreFreeXp": u"Ignorer l'expérience libre",
         u"showPercent": u"Afficher la progression en %",
         u"progressMode": u"Mode de progression",
         u"scale": u"Échelle",
-        u"barPosition": u"Position de la barre (px)",
+        u"position": u"Position (px)",
         u"posX": u"Horizontale (centre X)",
         u"posY": u"Verticale (haut Y)",
     },
     u"es": {
-        u"showBar": u"Mostrar la barra de progreso",
+        u"modes": u"Modos",
+        u"formatting": u"Formato",
+        u"layout": u"Diseño",
         u"showWhenComplete": u"Progreso completo",
         u"ignoreFreeXp": u"Ignorar la experiencia libre",
         u"showPercent": u"Mostrar el progreso en %",
         u"progressMode": u"Modo de progreso",
         u"scale": u"Escala",
-        u"barPosition": u"Posición de la barra (px)",
+        u"position": u"Posición (px)",
         u"posX": u"Horizontal (centro X)",
         u"posY": u"Vertical (arriba Y)",
     },
     u"it": {
-        u"showBar": u"Mostra la barra di avanzamento",
+        u"modes": u"Modalità",
+        u"formatting": u"Formattazione",
+        u"layout": u"Disposizione",
         u"showWhenComplete": u"Completamente progredito",
         u"ignoreFreeXp": u"Ignora l'esperienza libera",
         u"showPercent": u"Mostra l'avanzamento in %",
         u"progressMode": u"Modalità di avanzamento",
         u"scale": u"Scala",
-        u"barPosition": u"Posizione della barra (px)",
+        u"position": u"Posizione (px)",
         u"posX": u"Orizzontale (centro X)",
         u"posY": u"Verticale (alto Y)",
     },
     u"pl": {
-        u"showBar": u"Pokaż pasek postępu",
+        u"modes": u"Tryby",
+        u"formatting": u"Formatowanie",
+        u"layout": u"Układ",
         u"showWhenComplete": u"W pełni ukończone",
         u"ignoreFreeXp": u"Ignoruj wolne doświadczenie",
         u"showPercent": u"Pokaż postęp w %",
         u"progressMode": u"Tryb postępu",
         u"scale": u"Skala",
-        u"barPosition": u"Pozycja paska (px)",
+        u"position": u"Pozycja (px)",
         u"posX": u"Poziomo (środek X)",
         u"posY": u"Pionowo (góra Y)",
     },
     u"cs": {
-        u"showBar": u"Zobrazit lištu postupu",
+        u"modes": u"Režimy",
+        u"formatting": u"Formátování",
+        u"layout": u"Rozvržení",
         u"showWhenComplete": u"Plně dokončeno",
         u"ignoreFreeXp": u"Ignorovat volné zkušenosti",
         u"showPercent": u"Zobrazit postup v %",
         u"progressMode": u"Režim postupu",
         u"scale": u"Měřítko",
-        u"barPosition": u"Pozice lišty (px)",
+        u"position": u"Pozice (px)",
         u"posX": u"Vodorovně (střed X)",
         u"posY": u"Svisle (nahoře Y)",
     },
     u"ru": {
-        u"showBar": u"Показывать полосу прогресса",
+        u"modes": u"Режимы",
+        u"formatting": u"Форматирование",
+        u"layout": u"Расположение",
         u"showWhenComplete": u"Полностью пройдено",
         u"ignoreFreeXp": u"Игнорировать свободный опыт",
         u"showPercent": u"Показывать прогресс в %",
         u"progressMode": u"Режим прогресса",
         u"scale": u"Масштаб",
-        u"barPosition": u"Положение полосы (px)",
+        u"position": u"Положение (px)",
         u"posX": u"По горизонтали (центр X)",
         u"posY": u"По вертикали (верх Y)",
     },
     u"uk": {
-        u"showBar": u"Показувати смугу прогресу",
+        u"modes": u"Режими",
+        u"formatting": u"Форматування",
+        u"layout": u"Розташування",
         u"showWhenComplete": u"Повністю пройдено",
         u"ignoreFreeXp": u"Ігнорувати вільний досвід",
         u"showPercent": u"Показувати прогрес у %",
         u"progressMode": u"Режим прогресу",
         u"scale": u"Масштаб",
-        u"barPosition": u"Розташування смуги (px)",
+        # "Позиція", not "Розташування" -- the latter is the column3 header above it, and
+        # two identical captions one under the other read as a duplicated row.
+        u"position": u"Позиція (px)",
         u"posX": u"По горизонталі (центр X)",
         u"posY": u"По вертикалі (верх Y)",
     },
     u"hu": {
-        u"showBar": u"Folyamatjelző sáv megjelenítése",
+        u"modes": u"Módok",
+        u"formatting": u"Formázás",
+        u"layout": u"Elrendezés",
         u"showWhenComplete": u"Teljesen kész",
         u"ignoreFreeXp": u"Szabad tapasztalat mellőzése",
         u"showPercent": u"Haladás megjelenítése %-ban",
         u"progressMode": u"Haladási mód",
         u"scale": u"Méretezés",
-        u"barPosition": u"A sáv helyzete (px)",
+        u"position": u"Pozíció (px)",
         u"posX": u"Vízszintes (középpont X)",
         u"posY": u"Függőleges (felső Y)",
     },
     u"tr": {
-        u"showBar": u"İlerleme çubuğunu göster",
+        u"modes": u"Modlar",
+        u"formatting": u"Biçimlendirme",
+        u"layout": u"Yerleşim",
         u"showWhenComplete": u"Tamamen ilerlemiş",
         u"ignoreFreeXp": u"Serbest deneyimi yok say",
         u"showPercent": u"İlerlemeyi % olarak göster",
         u"progressMode": u"İlerleme modu",
         u"scale": u"Ölçek",
-        u"barPosition": u"Çubuk konumu (px)",
+        u"position": u"Konum (px)",
         u"posX": u"Yatay (merkez X)",
         u"posY": u"Dikey (üst Y)",
     },
@@ -215,7 +262,7 @@ _LABELS = {
 
 
 # --- SCALE DROPDOWN OPTION LABELS (hand-translated) -----------------------------------
-# The two option labels for the "scale" Dropdown: (Default, Large). Kept in their OWN
+# The two option labels for the "scale" radio group: (Default, Large). Kept in their OWN
 # table -- NOT in _LABELS -- because options are not per-control label/tooltip rows, so
 # folding them into _LABELS would break the label/tooltip key partition (see the
 # settings_i18n tests). render_panel attaches the localized pair on t["scale"]["options"];
@@ -236,7 +283,7 @@ _SCALE_OPTIONS = {
 
 
 # --- PROGRESS-MODE DROPDOWN OPTION LABELS (hand-translated) ---------------------------
-# The two option labels for the "progressMode" Dropdown: (Current, Current / Required).
+# The two option labels for the "progressMode" radio group: (Current, Current / Required).
 # Own table (see _SCALE_OPTIONS rationale). render_panel attaches the localized pair on
 # t["progressMode"]["options"]; English master + per-language fallback (marked on
 # fallback). Plain "/" only -- never an em-dash (the client renders one as "--").
@@ -255,14 +302,12 @@ _PROGRESS_OPTIONS = {
 }
 
 
-# --- TOOLTIPS: fixed English for EVERY control (never translated, never i18n) ----------
+# --- TOOLTIPS: fixed English for every INTERACTIVE control (never translated, never i18n)
 # (header, body). The header mirrors the control's English name; the body is the mod's
 # own explanatory prose. Deliberately English on every client -- see the module docstring.
+# The three category headers (modes / formatting / layout) are inert section captions and
+# carry NO entry here -- render_panel then omits their tooltip key entirely.
 _TOOLTIPS_EN = {
-    u"showBar": (u"Show Progress Bar",
-                 u"Master switch: shows the progress bar on the selected vehicle. Uncheck "
-                 u"to hide the bar completely on every vehicle. The options below turn its "
-                 u"individual modes on or off, and grey out while it's unchecked."),
     u"showWhenComplete": (u"Fully Progressed",
                           u"Keeps the bar visible on vehicles with nothing left to "
                           u"research, upgrade, or unlock. Uncheck to hide the bar once a "
@@ -301,10 +346,10 @@ _TOOLTIPS_EN = {
     u"showPercent": (u"Show Progress %",
                      u"Adds a progress percentage to the left of the XP readout. Works on "
                      u"its own or alongside Progress Mode. Off by default."),
-    u"barPosition": (u"Bar position",
-                     u"Ctrl+drag the bar in the garage to move it, or type exact "
-                     u"on-screen pixel coordinates below. Reset returns it to the "
-                     u"default position."),
+    u"position": (u"Position",
+                  u"Ctrl+drag the bar in the garage to move it, or type exact "
+                  u"on-screen pixel coordinates below. Reset returns it to the "
+                  u"default position."),
     u"posX": (u"Horizontal position",
               u"The bar's CENTER, in pixels from the left screen edge."),
     u"posY": (u"Vertical position",
@@ -319,7 +364,19 @@ def render_panel(wg_labels, lang=None):
     ``text`` (the LABEL) is localized: per-mode checkboxes take WG's own localized name
     from ``wg_labels`` (== ``i18n.widget_labels()``), everything else from the ``_LABELS``
     tables (English-fallback, marked on fallback). ``tooltip`` is the fixed English from
-    ``_TOOLTIPS_EN`` -- never translated. ``lang`` defaults to the client's language."""
+    ``_TOOLTIPS_EN`` -- never translated -- and is OMITTED for the three category headers,
+    which have no entry there. The ``SPACER`` sentinel names no control, so it is skipped
+    outright (it has no _LABELS row and would KeyError on the English fallback).
+    ``lang`` defaults to the client's language.
+
+    The three ``HEADER_KEYS`` come out wrapped in ``<b>...</b>`` (MSA Labels render HTML).
+    The wrap happens HERE and ONLY here -- never in the _LABELS tables (translation data
+    stays markup-free) and never in ``mod_settings._template()``. Both consumers of this
+    function must see the SAME string: _template() builds the fresh template from it, and
+    _sync_template_text() compares a STORED component's text against it. If _template()
+    wrapped independently, every init would see a mismatch, strip the bold back out, and
+    fire a pointless saveState() -- so one source of truth makes that divergence
+    impossible by construction."""
     if lang is None:
         lang = client_language()
     code = _norm(lang)
@@ -328,6 +385,8 @@ def render_panel(wg_labels, lang=None):
     wl = wg_labels or {}
     out = {}
     for key in COL1_KEYS + COL2_KEYS:
+        if key is SPACER:
+            continue
         if key in FEATURE_WG:
             text = wl.get(FEATURE_WG[key]) or _FEATURE_EN[key]   # WG label; i18n self-marks
         else:
@@ -335,10 +394,14 @@ def render_panel(wg_labels, lang=None):
             text = en_labels[key] if fb else labels[key]
             if fb:
                 text = i18n._mark(text)
-        header, body = _TOOLTIPS_EN[key]
-        out[key] = {u"text": text,
-                    u"tooltip": u"{HEADER}%s{/HEADER}{BODY}%s{/BODY}" % (header, body)}
-        # The two Dropdowns also carry their localized option labels (see _template()).
+        if key in HEADER_KEYS:
+            # Bold AFTER the fallback mark, so a marked fallback stays visible inside it.
+            text = u"<b>%s</b>" % text
+        out[key] = {u"text": text}
+        tip = _TOOLTIPS_EN.get(key)
+        if tip is not None:
+            out[key][u"tooltip"] = u"{HEADER}%s{/HEADER}{BODY}%s{/BODY}" % tip
+        # The two radio groups also carry their localized option labels (see _template()).
         if key == u"scale":
             out[key][u"options"] = _scale_options(code)
         elif key == u"progressMode":
@@ -361,7 +424,7 @@ def label(key, lang=None):
 
 
 def _scale_options(code):
-    """The localized scale-Dropdown option labels ``[Default, Large]`` for language
+    """The localized scale radio-group option labels ``[Default, Large]`` for language
     ``code`` (English fallback, marked on fallback -- same policy as the mod-invented
     labels). ``code`` is already a normalized ``_norm()`` key."""
     fb = code not in _SCALE_OPTIONS
@@ -372,7 +435,7 @@ def _scale_options(code):
 
 
 def _progress_options(code):
-    """The localized progressMode-Dropdown option labels ``[Current, Current / Required]``
+    """The localized progressMode radio-group option labels ``[Current, Current / Required]``
     for language ``code`` (English fallback, marked on fallback -- same policy as
     _scale_options). ``code`` is already a normalized ``_norm()`` key."""
     fb = code not in _PROGRESS_OPTIONS
