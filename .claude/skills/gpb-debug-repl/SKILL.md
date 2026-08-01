@@ -56,6 +56,23 @@ bugs deterministically. The sibling izeberg store `modsettings.dat` does NOT con
 linkage. (Used to root-cause the Large-after-cold-launch bug — see gpb-architecture "scale path
 fails safe" + `TASKS/scale-large-after-update-cold-launch.md`.)
 
+### Reading real XP prices with the client CLOSED (packed BigWorld sections)
+`res/packages/scripts.pkg` holds `item_defs/**` as **packed** (binary) BigWorld sections, so the
+XMLs aren't greppable — but the format is trivial enough to read in ~40 lines of Python, which is
+how you answer "what does X actually cost" without launching the game (companion technique to the
+`.mo` parse in gpb-architecture). Per section: `u16 nChildren`, then `u32 selfDesc` where
+`type = selfDesc >> 28` and `cumEnd = selfDesc & 0x0FFFFFFF`, then `nChildren` x
+`(u16 keyIdx, u32 desc)` pairs (same `type`/cumulative-end packing), then the data block — each
+child's bytes are `[prev cumEnd : cumEnd]`. Key strings come from the file's own dictionary.
+Figures established this way (EU **2.3.1.0**):
+- **Field modifications** — `post_progression/prices.xml` `unlockBaseModificationCost`, per tier:
+  t6 **3500** / t7 **7000** / t8 **11500** / t9 **20000** / t10 **28000** per level.
+- **Tier-XI skill tree** — **325000** for ALL 22 trees: 26 nodes = 20x10000 + 5x20000 + 1x25000
+  (node price groups from each `veh_skill_configs/*_tree.xml`, prices from the same `prices.xml`).
+- **Prestige / Elite Level XP is SERVER config and is NOT in the client files** — don't hunt for it
+  here; read it live (`ILobbyContext…prestigeConfig`, see `references/game-api.md`) or use the
+  repo's recorded fixture figures.
+
 ### Reading a write-only VM property back
 The bridge exposes the mounted pair as `gameface_bridge._active = (host_vm, rvm)`. VM properties
 are write-only (there's no `getScale`), but you can read any back via the generic Wulf accessor

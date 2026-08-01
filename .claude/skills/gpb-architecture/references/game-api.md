@@ -27,6 +27,17 @@ use the **gpb-debug-repl** skill.
 - `engine_adapter.is_color_blind()` ← `ISettingsCore.getSetting(GRAPHICS.COLOR_BLIND)`.
 - `tech_read` ← `veh.getUnlocksDescrs()`, `items.getTypeOfCompactDescr` + `GUI_ITEM_TYPE.VEHICLE`,
   `_read_common.blueprint_effective_cost` (blueprint discount — see catalogue's WRITE section).
+  - **`unlocksDescrs` is the OUTGOING unlock graph — what this vehicle unlocks, not what it cost.**
+    A vehicle's own purchase price lives on its **PARENT** node and is never in its own list; its
+    successors' prices are. Default/stock modules never appear at all (they go through
+    `__collectDefaultUnlocks`). So "Σ costs in `unlocksDescrs`" = *everything researchable FROM this
+    vehicle* — the semantics the COMPLETE Research total deliberately reports. Engine corroboration:
+    `isEliteByDefault = not self.unlocksDescrs and not self.eliteByProgression`.
+    Corpus scan of EU **2.3.1.0** `item_defs/vehicles/**`: **796 of 1251** vehicle types carry no
+    `<unlocks>` element at all (premiums, reward tanks, tier XI) → those show **no Research box**;
+    exactly **20** tier-X tanks carry a single 325000-XP successor edge and nothing else;
+    **zero-cost** unlock entries exist ONLY in the **6** Steel Hunter `_SH` types. Answers "why does
+    this vehicle report 0 / no Research category" without opening the client.
 - `post_progression_read` / `skill_tree_read` ← `veh.postProgression` (`isVehSkillTree`,
   `iterOrderedSteps`), effect text off `action._descriptor` / skill-tree `tooltips.description.dyn`.
 - `prestige_read` ← `gui.prestige.prestige_helpers` (`hasVehiclePrestige`, `getVehiclePrestige`,

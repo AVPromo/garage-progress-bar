@@ -34,7 +34,8 @@ src/res/scripts/client/
     domain/types.py                   # engine-free data types (2/3 compatible) + Mode
     domain/constants.py               # Category / GradeFamily string ids — the JS wire contract
     domain/builder.py                 # MODE STATE MACHINE (build_model + bar_visible)
-    domain/resolvers/{techtree,fieldmods,skilltree,elite}.py  # pure snapshot -> ticks
+    domain/resolvers/{techtree,fieldmods,skilltree,elite,potential}.py  # pure snapshot -> ticks
+    domain/resolvers/complete.py      #   the COMPLETE gate: snapshot -> finished categories
 src/res/gui/gameface/mods/14th_ua/WGModResearch/
   WGModResearch.{js,css}              # widget (see gpb-widget skill)
 ```
@@ -74,7 +75,8 @@ FIELD_MODS → POTENTIAL_TIER_XI (opt-in speculative bar; entry-gated on `enable
 only for a Tier-X tank with NO real Tier XI — `builder._b_potential`) → ELITE_REWARDS (unearned
 tier-XI milestone rewards) → ELITE (prestige grade band) → COMPLETE. This is the `_BUILDERS`
 tuple order (`_b_tech, _b_skill, _b_field, _b_potential, _b_elite_rewards, _b_elite`); there are
-SEVEN real modes plus HIDDEN. `build_model` takes `enabled` (Mode strings left ON; None = all). If a vehicle
+SEVEN real modes plus HIDDEN. COMPLETE has NO builder of its own — see the next section.
+`build_model` takes `enabled` (Mode strings left ON; None = all). If a vehicle
 RESOLVES to a mode toggled off, `_emit()` returns a `Mode.HIDDEN` placeholder — **no
 fall-through** to a lower-priority mode. `bar_visible(overlay_closed, hide_always,
 hide_when_complete, mode, in_garage)` combines that with the master hide switch, the
@@ -85,7 +87,77 @@ settings→builder seam — it maps the six per-mode checkbox settings to the `M
 toggle→Mode mapping regression here hides behind a green builder suite and has its own guard in
 `test_enabled_modes_*` (`tests/test_mod_settings_template.py`).
 
+## COMPLETE ("Fully Progressed") — the gate, not a builder
+Shipped in `e0ae891`. **The gate is "every category that APPLIES to this vehicle is finished"** —
+NOT, as it was before, "no builder returned a candidate". The old `not cands` gate was almost
+unreachable in practice: `_b_elite` returns a grade band even at the max elite level, so any
+prestige vehicle kept showing the ELITE bar forever. (Behaviour change users see: a maxed-elite
+tank now shows Fully Progressed instead of the Elite bar.)
+- **Resolution order in `build_model`**: explicit per-vehicle `override` (if still available) →
+  **COMPLETE** (`done_cats` non-empty AND `POTENTIAL_TIER_XI not in by_mode`) → the old
+  `not cands` no-data COMPLETE `_placeholder` → priority winner (or HIDDEN if its toggle is off).
+  `POTENTIAL_TIER_XI` still wins when it applies + is opted in: it is a speculative goal AHEAD of
+  the vehicle, never a category it has finished (and so it is deliberately absent from
+  `complete._CATEGORIES`). COMPLETE has no per-mode user toggle — `bar_visible`'s
+  `show_when_complete` governs it.
+- **`domain/resolvers/complete.py` is pure**: `resolve(snapshot) -> [(Mode string, raw total XP)]`,
+  one entry per applicable category in bar-priority order, or `[]` while anything is unfinished /
+  nothing applies. It adds NO engine reads — every applies/done/price fact is already on the
+  snapshot. Applies/done matrix:
+
+  | category | applies when | done when | total XP |
+  |---|---|---|---|
+  | TECH_TREE | `tech_unlocks` non-empty | every entry `researched` | Σ `xp_cost` of the OUTGOING unlock graph |
+  | SKILL_TREE | `is_skill_tree` | `skilltree_done >= skilltree_total` | `skilltree_total_xp` |
+  | FIELD_MODS | `fieldmods_total > 0` | `fieldmods_done == fieldmods_total` | Σ step `xp_cost` up to `fieldmods.max_level(tier)` |
+  | ELITE_REWARDS | `elite_rewards` non-empty | every reward `achieved` | `elite_level_xp[last reward level]` |
+  | ELITE | `has_prestige and elite_grades` | `elite_level >= elite_max_level` | `elite_level_xp[elite_max_level]` |
+
+  **FIELD_MODS and SKILL_TREE are mutually exclusive** (a tier-XI vehicle reads field mods 0/0), so
+  a real row can hold at most FOUR categories — the widget's 5-entry dev preview is an impossible
+  state.
+- **Totals are RAW `xp_cost`, never `xp_cost_effective`.** A blueprint discount is a one-off
+  per-player rebate; reporting it would misstate what the category itself cost. (The opposite of
+  the tech-tree TICK rule below — different question, different price.) A total that can't be
+  derived degrades to 0 and the tooltip simply shows no cost line.
+- **The Research total means "researchable FROM this vehicle", and that is intentional** (docstring
+  confirmed, not a bug): `unlocksDescrs` is the OUTGOING unlock graph — modules + child vehicles —
+  and a vehicle's own purchase price lives on its PARENT node. Default/stock modules never appear
+  there at all. See `references/game-api.md` for the full semantics and the corpus counts.
+- **Wire: NO view-model or marshal change.** The finished categories ride the existing
+  `avail_upgrades` / `UpgradeVM` array (already marshalled unconditionally), one `ProgressionStep`
+  each carrying `category` + its total as `xp_cost` + `done=True`. `_complete_model` is a REAL bar
+  (`scale_min=0, scale_max=1, fill_vehicle=1`) — the old `_placeholder`'s 0/0 scale drew nothing,
+  which is why COMPLETE used to be invisible. `progress_current` = the summed total (the header's
+  upper-right figure), `progress_required` = 0 (so the widget's `current / required` + `%` readouts
+  fall back to the current-only figure — they are gated on `required > 0`). It also pushes
+  `elite_current_icon` and `elite_max_level` for the elite box's badge.
+- **The header title comes from the SETTINGS PANEL's table, via a new seam.** The game ships no
+  "Fully Progressed" string, but `settings_i18n`'s `showWhenComplete` label is exactly that text,
+  already translated for all 11 languages. `settings_i18n.label(key, lang=None)` (pure given
+  `lang`) exposes ONE such label; `i18n._complete_label()` calls it behind a guard and
+  `widget_labels()["headerComplete"]` publishes it. The import is **LAZY** — `settings_i18n`
+  imports `i18n`, so a top-level import would be circular. **Convention:** a widget string with no
+  WG equivalent that the settings panel already ships comes from the panel tables through
+  `settings_i18n.label()` — never a second translation table.
+- Render side (golden gradient, `done_big.png`, the `.wg-chip` category row, the `FORCE_COMPLETE`
+  dev flag): gpb-widget → "COMPLETE".
+
 ## Conventions specific to this mod
+- **A GATE resolver must fail CLOSED — the repo-wide fail-soft rule INVERTS into a bug here.**
+  "Every engine read fails soft to empty" (the harness `wotmod-architecture` convention) is right
+  for a resolver that *displays* data: one bad read degrades one category. It is **wrong** wherever
+  the value gates a *claim*. Live bug, caught by qa before `e0ae891` shipped: `complete.resolve`
+  originally wrapped applicability+doneness in one `try`, so a category whose probe raised was
+  DROPPED — `resolve()` then returned non-empty and an UNFINISHED vehicle rendered "Fully
+  Progressed". Real repro: `tier=None` made `fieldmods.max_level()` raise while field mods stood at
+  3/8. Fix = **probe applicability separately from doneness** (`_CATEGORIES` holds
+  `(mode, applies, probe)`), so an applicable-but-unreadable category is kept and counted as NOT
+  done and still vetoes; only a category we can't even tell applies is skipped (there, an
+  exception is indistinguishable from "not applicable", since the readers already degrade to
+  empty). Rule of thumb: **fail soft when the answer is "what to show", fail closed when the answer
+  is "is it finished / allowed / paid".** *(Generic — propagate a terse version to the harness
+  `wotmod-architecture` fail-soft bullet. Not edited there.)*
 - **Tech-tree ticks are priced PER ITEM, not cumulatively.** `techtree.py` places each tick at
   its own cost (`xp_position = cost`, `affordable = cost <= spendable`) — items are
   independently researchable. Field mods are the exception (`fieldmods.py` stays cumulative —
@@ -194,7 +266,9 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
     so `_elite_model` falls back to reconstructed cumulative `combat`); `progress_required` = the
     resolver-PROMOTED trailing-tick cumulative XP (`resolve_reward_track` → last reward level's
     cumulative XP, promoted to a scalar so the builder needn't walk ticks).
-  - **COMPLETE / HIDDEN**: neither scalar is set (0).
+  - **COMPLETE**: `progress_current` = the SUM of the finished categories' totals (the header's
+    upper-right figure), `progress_required` = **0** — nothing is left to require, so the widget
+    falls back to the current-only readout and hides the `%`. **HIDDEN**: neither scalar is set (0).
   - **THE TRAP:** for ELITE_REWARDS and SKILL_TREE, `scale_max` is a LEVEL or NODE COUNT, not an
     XP amount — the per-XP denominator lives per-tick as `Tick.xp_required` (from
     `snapshot.elite_level_xp`). A naive `spendable_xp / scale_max` for those two modes is WRONG.
@@ -222,40 +296,52 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
   existing install without walking the stored template in place, and needs NO `settingsVersion`
   bump) lives in the **wotmod-i18n-settings** harness skill. This mod's *concretes* only
   (`adapter/settings_i18n.py` + `bridge/mod_settings.py`):
-  - **`showBar` is a MASTER checkbox with 7 nested children** — the 6 per-mode toggles +
-    `showWhenComplete` — bound by a hand-set `"masterVarName": "showBar"` on
-    each child in `mod_settings._child()`/`_template()`, NOT via Aslain's `createControlsGroup`
-    (keeps `_template()` a pure, unit-testable dict; the key is simply ignored under
-    izeberg / pytest). Aslain greys + disables the children while `showBar` is off; no
-    `masterIndent` key means they render indented. **`ignoreFreeXp` is a STANDALONE checkbox**
-    (no `masterVarName`), placed last in column1 after the `showBar` group.
-    **Every structural change here needs a `settingsVersion` bump** — MSA caches the panel
-    layout keyed by `settingsVersion` and reuses the STORED template on an existing install
-    until you bump, so nesting AND re-parenting a control between groups both require it
-    (adding/removing a control does too): bumped 4->5 when the modes were inverted into the
-    `showBar` master, then 5->6 when `ignoreFreeXp` was moved OUT of that master to a standalone
-    control — no `varName` and no default changed, yet the relocation alone still needed the
-    bump (confirmed live: it didn't render standalone until 5->6) — then 6->7 when the `scale`
-    Dropdown was added to column2 (a new control + new `varName` + option labels; Aslain folds
-    option labels into the template signature, so the bump is mandatory to push it and its
-    localized options to an existing install — see the scale bullet below) — then 7->8 when the
-    `progressMode` Dropdown (column2) + `showPercent` CheckBox were added (two new
-    `varName`s + another option-bearing control, same mandatory-bump reason) — then 8->9 when
-    `showPercent` was RE-PARENTED from column1 to column2 (directly under `progressMode`, since
-    both govern the XP readout); re-parenting a control between columns is a layout change and
-    needs the bump exactly like the earlier `ignoreFreeXp` relocation did. Text-only
-    label/tooltip edits do NOT bump (see the i18n bullet above). (MSA's full nesting toolkit —
-    `masterVarName`/`enableWhen`/`visibleWhen`, `column1..column4` — is in
-    wotmod-architecture -> ModsSettingsAPI. That skill also documents the WIPE every bump causes
-    and the merge-forward migration in `bridge/mod_settings.py` init() that survives it — which
-    is why the bumps above never lost users' settings.)
-  - **`settings_i18n.COL1_KEYS` must stay in lockstep with `_template()` column1 wire order.**
-    `_sync_template_text` walks the STORED template POSITIONALLY against
-    `COL1_KEYS`/`COL2_KEYS`, so reordering column1 without updating `COL1_KEYS` silently
-    mislabels controls (no crash). Guard test: `test_col1_keys_match_template_wire_order` in
+  - **Panel shape: three `Label`-headed categories over TWO columns, no master checkbox.**
+    column1 = "Modes" (the seven per-mode toggles, all STANDALONE — the old `showBar` master
+    was removed in the v10 restructure, so turning all seven off is what hides the bar).
+    column2 = "Formatting" (`ignoreFreeXp`, `showPercent`, `progressMode`) then an
+    `{"type": "Empty", "height": 20}` spacer then "Layout" (`scale`, a "Position" sub-label,
+    `posX`, `posY`). **"Layout" deliberately shares column2 instead of declaring `column3`** —
+    a third declared column only renders side-by-side while the USER's global MSA
+    `multiColumnMode` toolbar toggle is on (default OFF); with it off Aslain folds the declared
+    columns round-robin (`i % columnCount`, columnCount=2) and `column3` would stack UNDER
+    column1. Full mechanism + caveats: wotmod-architecture → "DESIGN FOR TWO COLUMNS".
+  - **DON'T bump `settingsVersion` for a layout change.** Aslain 1.6.4 compares templates by a
+    SORTED FLAT `(varName, type, domain)` signature across all four columns
+    (`_settingsStructure`, api.py:667-683) — column identity, ordering, `masterVarName`, labels,
+    tooltips and default `value` are ABSENT from it, so re-parenting / re-ordering / moving a
+    control between columns takes `setModTemplate`'s in-place else-branch: new template stored
+    and rendered, **saved values untouched**. Only these are structural: adding/removing a
+    `varName`, changing a `type`, changing a slider's min/max/snapInterval, changing Dropdown
+    option LABELS. Every bump costs a values wipe that `init()` then has to migrate back — the
+    8->9 bump (a pure column move of `showPercent`) was gratuitous and wiped users' settings for
+    nothing. Rationale + `api.py` line refs: wotmod-architecture → "What actually needs a
+    `settingsVersion` bump"; the same correction is inlined in `mod_settings._template()`.
+    Honest bump history: 4->5 (modes inverted into the then-`showBar` master — *the layout half
+    of that was not the reason; the `varName`/polarity change was*), 5->6 (`ignoreFreeXp`
+    de-nested — **unnecessary**), 6->7 (`scale` Dropdown added — required), 7->8
+    (`progressMode` + `showPercent` added — required), 8->9 (`showPercent` moved column1→column2
+    — **unnecessary**), 9->10 (three-category restructure — required *only* because it REMOVED
+    the `showBar` varName). Current `settingsVersion` = **10**. Caveat: both this and the column
+    finding are STATIC analysis of the disassembled Aslain 1.6.4 `api.pyc` (Py 2.7
+    `marshal`+`dis`) from `installer/vendor/aslain.modssettingsapi_1.6.4.wotmod`, not confirmed
+    live in-client; `column3`/`column4` + `multiColumnMode` look like Aslain-fork additions and
+    izeberg's API may differ.
+  - **Open question (unresolved, worth pinning down):** whether varName-less components
+    (`Label`, `Empty`) are collected into `_settingsStructure` at all. If they are, adding a
+    header/spacer is itself structural. Moot for 9->10 (the `showBar` removal forced that bump
+    anyway), but it decides whether a future Label/Empty-only layout edit needs one.
+  - **`settings_i18n.COL1_KEYS`/`COL2_KEYS` must stay in lockstep with `_template()` wire order,
+    POSITIONALLY — textless rows included.** `_sync_template_text` zips the key tuples against
+    the STORED template's component list, so **every textless row (a `Label` header, an `Empty`
+    spacer) must still occupy a slot** or every key after it shifts by one and the panel
+    silently relabels itself on a client-language change (no crash). The repo uses a
+    `SPACER = None` sentinel for those slots (`settings_i18n.py:69`); `_sync_template_text`
+    tolerates it via `t.get(key)` → `None` → continue, but **`render_panel` needs an explicit
+    `key is SPACER` skip** (`settings_i18n.py:373`) — without it the walk raised
+    `KeyError: None`. Guard: the positional-alignment tests in
     `tests/test_mod_settings_template.py`.
   - **Only the panel LABELS are localized** — NOT tooltips, NOT anything outside the panel.
-    `settingsVersion` is **9** (bump history in the bullet above).
   - **The `scale` control is a `Dropdown`** (column2, ABOVE the Bar position controls) — the
     Default/Large bar-size selector. Its Aslain descriptor uses `value` = the current 0-based
     index (`_clamp_scale` coerces a bad/out-of-range read to `0`) and `options` =
@@ -264,8 +350,9 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
     folding them in would break the positional `COL*_KEYS` / `_sync_template_text` partition
     (its tests enforce this). `render_panel` resolves them (same `_norm` + English fallback) and
     attaches the localized pair onto `t["scale"]["options"]`; `_template()` drops it into the
-    descriptor. `COL2_KEYS` = `(scale, progressMode, showPercent, barPosition, posX, posY)`
-    (`progressMode`/`showPercent` sit between `scale` and `barPosition`). Adding it bumped
+    descriptor. `COL2_KEYS` = `(formatting, ignoreFreeXp, showPercent, progressMode, SPACER,
+    layout, scale, position, posX, posY)` — the three category `Label`s and the `Empty` spacer
+    each own a slot (see the lockstep bullet above). Adding it bumped
     `settingsVersion` 6->7 (option-set change — see wotmod-i18n-settings "Option-bearing
     controls"). `mod_settings.scale()` reads the index back; `bridge.push` writes it to
     `ResearchVM.scale` (prop 33); the widget folds `.wg-large` when it's `1` — the VISUAL
@@ -315,6 +402,21 @@ toggle→Mode mapping regression here hides behind a green builder suite and has
     Ships `cs de en es fr hu it pl ru tr uk`; verify exact client codes live (gpb-debug-repl).
   - The propagate-to-existing-installs step is `_sync_template_text(api)`, called unconditionally
     per candidate api in `init()` (walks the STORED template and rewrites its label text in place).
+  - **The `<b>` bold-header wrap MUST live inside `render_panel()`, not `_template()`** — the
+    single function both the initial build and `_sync_template_text` source their text from.
+    `HEADER_KEYS` (frozenset of the three category `Label` keys) gates the wrap in
+    `render_panel()`. Applying it a layer higher would make the sync compare stored (wrapped) vs
+    freshly-rendered (unwrapped) text on every launch, strip the wrap back out, and
+    `saveState()` on every init — see wotmod-i18n-settings "A display transform belongs in ONE
+    function" for the mechanism. Guard: `test_sync_template_text_is_idempotent_over_the_bold_headers`
+    (a DOUBLE sync asserting zero writes on the second pass — a single "is it bold" assertion
+    would miss this). `bridge/mod_settings.py`'s `_label()` sets `useHTML: True` on the Label
+    descriptor but does NOT itself wrap — it just declares the descriptor as HTML-capable.
+  - **`scale`'s `Dropdown` could be swapped for an inline `RadioButtonGroup` with zero coercion
+    changes** — same 0-based-index value shape; only the descriptor `type` (+ `inline: True`)
+    would change. See wotmod-architecture's component-types bullet for the full tradeoff
+    (structural → `settingsVersion` bump; MSA >= 1.6.1 for `inline`). Not applied here — noted
+    for if the panel's visual layout is revisited.
 - **Bar position is resolution-aware, and the recompute lives in the WIDGET, not Python.**
   `posX`/`posY` are px, `0/0` = auto (the resolution-relative CSS default position — centered,
   ~17.6vh). The two position steppers (`posX` "Horizontal (center X)", `posY` "Vertical (top Y)")
