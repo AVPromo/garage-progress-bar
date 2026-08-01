@@ -57,8 +57,9 @@ skill is the concrete wiring for the Garage Progress Bar.
   literal above is only an example; a client bump is run via **wotmod-upgrade-analyzer** /
   **wotmod-upgrade-implementer**, not hand-edited here).
 - **Dependencies (same `mods/<version>/`):** OpenWG GameFace is a **hard** dependency; the
-  bar itself renders without ModsSettingsAPI (`izeberg.modssettingsapi`), but the settings
-  panel, per-mode toggles, and drag-position persistence need it.
+  bar itself renders without ModsSettingsAPI (bundled `aslain.modssettingsapi_1.6.4` +
+  `modslistapi_1.7.8`, import surface `gui.aslainMenu`), but the settings panel, per-mode
+  toggles, and drag-position persistence need it. Mechanics: **wotmod-msa-settings**.
 
 ## What's unit-testable vs in-game-only (plan verification around this)
 `pytest` (Py 3.13, no client) covers the ENGINE-FREE code only: everything under `domain/`

@@ -1,15 +1,16 @@
 ---
 name: gpb-architecture
-description: Architecture of the Garage Progress Bar WoT mod specifically — its concrete wgmod_research file tree, the seven bar modes + priority order (including the opt-in POTENTIAL_TIER_XI speculative bar), the resolvers, per-item tech-tree pricing, blueprint discount, done-marker reconcile, and the ResearchVM/TickVM/UpgradeVM shapes. Use when editing or extending THIS mod's Python, adding a bar mode, tracing a click→research action, or debugging why the bar doesn't update. (For the reusable engine-free domain/adapter/bridge discipline and the conventions that bite, see the wotmod-architecture harness skill; for the JS/CSS widget, gpb-widget; for the settings-panel localization pattern, wotmod-i18n-settings; for live game symbols, references/game-api.md.)
+description: Architecture of the Garage Progress Bar WoT mod specifically — its concrete wgmod_research file tree, the seven bar modes + priority order (including the opt-in POTENTIAL_TIER_XI speculative bar), the resolvers, per-item tech-tree pricing, blueprint discount, done-marker reconcile, and the ResearchVM/TickVM/UpgradeVM shapes. Use when editing or extending THIS mod's Python, adding a bar mode, tracing a click→research action, or debugging why the bar doesn't update. (For the reusable engine-free domain/adapter/bridge discipline and the conventions that bite, see the wotmod-architecture harness skill; for the JS/CSS widget, gpb-widget; for the ModsSettingsAPI panel's mechanics, wotmod-msa-settings; for the settings-panel localization pattern, wotmod-i18n-settings; for live game symbols, references/game-api.md.)
 ---
 
 # wgmod architecture (this mod's specifics)
 
 The reusable pattern — engine-free `domain/` vs `adapter/` (reads+writes) vs `bridge/`
 (Wulf/Gameface), and the conventions that bite (listeners re-arm every mount, Wulf MAP-arg,
-fail-soft reads, `_compat.py` shim, ModsSettingsAPI replace+saveState, hand-numbered VM
-indices, import≠ready) — lives in the **wotmod-architecture** harness skill. This skill is
-how the Garage Progress Bar realizes it.
+fail-soft reads, `_compat.py` shim, hand-numbered VM indices, import≠ready) — lives in the
+**wotmod-architecture** harness skill, and the MSA settings panel's mechanics
+(register/migrate lifecycle, replace-not-merge + `saveState`, guards, bump rules) in
+**wotmod-msa-settings**. This skill is how the Garage Progress Bar realizes them.
 
 ```
 src/res/scripts/client/
@@ -305,32 +306,21 @@ tank now shows Fully Progressed instead of the Elite bar.)
     a third declared column only renders side-by-side while the USER's global MSA
     `multiColumnMode` toolbar toggle is on (default OFF); with it off Aslain folds the declared
     columns round-robin (`i % columnCount`, columnCount=2) and `column3` would stack UNDER
-    column1. Full mechanism + caveats: wotmod-architecture → "DESIGN FOR TWO COLUMNS".
-  - **DON'T bump `settingsVersion` for a layout change.** Aslain 1.6.4 compares templates by a
-    SORTED FLAT `(varName, type, domain)` signature across all four columns
-    (`_settingsStructure`, api.py:667-683) — column identity, ordering, `masterVarName`, labels,
-    tooltips and default `value` are ABSENT from it, so re-parenting / re-ordering / moving a
-    control between columns takes `setModTemplate`'s in-place else-branch: new template stored
-    and rendered, **saved values untouched**. Only these are structural: adding/removing a
-    `varName`, changing a `type`, changing a slider's min/max/snapInterval, changing Dropdown
-    option LABELS. Every bump costs a values wipe that `init()` then has to migrate back — the
-    8->9 bump (a pure column move of `showPercent`) was gratuitous and wiped users' settings for
-    nothing. Rationale + `api.py` line refs: wotmod-architecture → "What actually needs a
-    `settingsVersion` bump"; the same correction is inlined in `mod_settings._template()`.
+    column1. Full mechanism + caveats: wotmod-msa-settings → columns.
+  - **DON'T bump `settingsVersion` for a layout change** — the bump rules (what is structural to
+    Aslain's `(varName, type, domain)` signature and what isn't, and why every bump costs a wipe
+    `init()` then migrates back) are wotmod-msa-settings; the same correction is inlined in
+    `mod_settings._template()`. This mod's 8->9 bump (a pure column move of `showPercent`) was
+    gratuitous and wiped users' settings for nothing.
     Honest bump history: 4->5 (modes inverted into the then-`showBar` master — *the layout half
     of that was not the reason; the `varName`/polarity change was*), 5->6 (`ignoreFreeXp`
     de-nested — **unnecessary**), 6->7 (`scale` Dropdown added — required), 7->8
     (`progressMode` + `showPercent` added — required), 8->9 (`showPercent` moved column1→column2
     — **unnecessary**), 9->10 (three-category restructure — required *only* because it REMOVED
-    the `showBar` varName). Current `settingsVersion` = **10**. Caveat: both this and the column
-    finding are STATIC analysis of the disassembled Aslain 1.6.4 `api.pyc` (Py 2.7
-    `marshal`+`dis`) from `installer/vendor/aslain.modssettingsapi_1.6.4.wotmod`, not confirmed
-    live in-client; `column3`/`column4` + `multiColumnMode` look like Aslain-fork additions and
-    izeberg's API may differ.
-  - **Open question (unresolved, worth pinning down):** whether varName-less components
-    (`Label`, `Empty`) are collected into `_settingsStructure` at all. If they are, adding a
-    header/spacer is itself structural. Moot for 9->10 (the `showBar` removal forced that bump
-    anyway), but it decides whether a future Label/Empty-only layout edit needs one.
+    the `showBar` varName), 10->11 (`scale` + `progressMode` re-typed from `Dropdown` to inline
+    `RadioButtonGroup` — a `type` change, genuinely structural). Current `settingsVersion` =
+    **11**. (varName-less `Label`/`Empty` rows are NOT collected into
+    `_settingsStructure` — resolved in wotmod-msa-settings.)
   - **`settings_i18n.COL1_KEYS`/`COL2_KEYS` must stay in lockstep with `_template()` wire order,
     POSITIONALLY — textless rows included.** `_sync_template_text` zips the key tuples against
     the STORED template's component list, so **every textless row (a `Label` header, an `Empty`
@@ -342,7 +332,8 @@ tank now shows Fully Progressed instead of the Elite bar.)
     `KeyError: None`. Guard: the positional-alignment tests in
     `tests/test_mod_settings_template.py`.
   - **Only the panel LABELS are localized** — NOT tooltips, NOT anything outside the panel.
-  - **The `scale` control is a `Dropdown`** (column2, ABOVE the Bar position controls) — the
+  - **The `scale` control is an inline `RadioButtonGroup`** (column2, ABOVE the Bar position
+    controls; a `Dropdown` before v11) — the
     Default/Large bar-size selector. Its Aslain descriptor uses `value` = the current 0-based
     index (`_clamp_scale` coerces a bad/out-of-range read to `0`) and `options` =
     `[{"label": …}]`. `settings_i18n` keeps the two option-label strings (Default / Large) in a
@@ -369,24 +360,15 @@ tank now shows Fully Progressed instead of the Elite bar.)
       reading a STALE stored value (see `TASKS/scale-large-after-update-cold-launch.md`; leading
       hypothesis, not yet fully confirmed). Same reasoning applies to `progressMode` (also a
       fail-safe-to-0 Dropdown index).
-    - **`init()` on a settingsVersion bump (Aslain 1.6.4): `setModTemplate` self-persists.** When
-      `getModSettings` returns falsy (the bump/fresh branch), `setModTemplate` RESETS every stored
-      value to template defaults AND persists the version bump itself via two internal debounced
-      `saveState()` calls (decompiled api.py:209,226), then returns the fresh defaults — so the
-      mod's bump branch need NOT call `saveState` for the version to stick, and a Dropdown resets
-      to its template `value` (scale → 0 = small). The reset-to-defaults direction therefore
-      CANNOT produce Large; it DOES explain a wiped pinned position after an update. The
-      settings-preservation migration (HEAD `0fc07fc`: capture `old_raw` from
-      `api.state['settings'][LINKAGE]` before `setModTemplate`, overlay surviving values, re-write)
-      overlays the user's values back on top so the transient reset never lands on disk.
-  - **MSA Dropdown `_apply()` GOTCHA — clamp a Dropdown's int index BEFORE the generic
-    `bool()` fallthrough.** `mod_settings._apply()` type-coerces each key: position keys →
-    `clamp_pos`, `modeOverrides` → verbatim string, and **everything else → `bool(...)`**. A
-    Dropdown value is an int index, so it MUST get its own `elif` branch (`scale` →
-    `_clamp_scale`, `progressMode` → `_clamp_progress_mode`) placed ABOVE that `else: bool(...)`
-    — otherwise index `1` silently becomes `True` and index `0` becomes `False`, and the
-    selection is destroyed on the first settings-change round-trip. Any new Dropdown needs its own
-    clamp + `elif`; never let it reach the `bool()` branch.
+    - **On a `settingsVersion` bump the reset-to-defaults direction CANNOT produce Large** — the
+      bump branch resets every stored value to the template's `value` (scale → `0` = small), so it
+      explains a wiped pinned position after an update but never a Large bar. The bump/migrate
+      mechanics themselves (`setModTemplate` self-persisting, the `old_raw` overlay landing as one
+      debounced write — shipped in `0fc07fc`) are wotmod-msa-settings.
+  - **The int-index keys need their own `_apply()` branch ABOVE the `bool()` fallthrough** —
+    `scale` → `_clamp_index`, `progressMode` → `_clamp_index`, position keys → `clamp_pos`,
+    `modeOverrides` → verbatim string; everything else is a bool. Any new index-valued control
+    needs its own clamp + branch. Why the generic `bool()` destroys an index: wotmod-msa-settings.
   - **Two label sources.** (1) **WG feature names** (Research, Upgrades, Field Modifications,
     Elite System, Elite Rewards, Tier XI) reuse WG's OWN localized strings via
     `i18n.widget_labels()` — `FEATURE_WG` maps each checkbox → its widget-labels key, so they match
@@ -412,11 +394,10 @@ tank now shows Fully Progressed instead of the Elite bar.)
     (a DOUBLE sync asserting zero writes on the second pass — a single "is it bold" assertion
     would miss this). `bridge/mod_settings.py`'s `_label()` sets `useHTML: True` on the Label
     descriptor but does NOT itself wrap — it just declares the descriptor as HTML-capable.
-  - **`scale`'s `Dropdown` could be swapped for an inline `RadioButtonGroup` with zero coercion
-    changes** — same 0-based-index value shape; only the descriptor `type` (+ `inline: True`)
-    would change. See wotmod-architecture's component-types bullet for the full tradeoff
-    (structural → `settingsVersion` bump; MSA >= 1.6.1 for `inline`). Not applied here — noted
-    for if the panel's visual layout is revisited.
+  - **`scale` and `progressMode` ARE inline `RadioButtonGroup`s as of `settingsVersion` 11** —
+    swapped from `Dropdown` with zero coercion changes (same 0-based-index value shape; only the
+    descriptor `type` + `inline: True` moved), at the cost of the bump a `type` change forces.
+    `inline` is emitted as a plain KEY, not through the vendor kwarg — see wotmod-msa-settings.
 - **Bar position is resolution-aware, and the recompute lives in the WIDGET, not Python.**
   `posX`/`posY` are px, `0/0` = auto (the resolution-relative CSS default position — centered,
   ~17.6vh). The two position steppers (`posX` "Horizontal (center X)", `posY` "Vertical (top Y)")
