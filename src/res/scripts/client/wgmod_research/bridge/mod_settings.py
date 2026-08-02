@@ -252,13 +252,9 @@ def _template():
         # the "showBar" master was REMOVED. The re-grouping itself (controls redistributed
         # across columns, masterVarName dropped) would need no bump per the correction
         # above -- but REMOVING the showBar varName does, so this one is mandatory.
-        # Open question, deliberately left unresolved: whether the varName-LESS rows this
-        # layout adds (the three `Label` headers and the `Empty` spacer) enter
-        # _settingsStructure's signature at all -- the tuple is keyed on varName, but it
-        # wasn't verified whether such components are collected or filtered out first. If
-        # they ARE collected, adding them is itself structural. Moot here (the showBar
-        # removal already forces the bump); worth pinning down before shipping a layout
-        # change that adds ONLY Label/Empty rows and nothing else.
+        # RESOLVED (was left open above): a varName-LESS row (`Label`, `Empty`) is NOT
+        # collected into Aslain's _settingsStructure signature at all -- only varName-
+        # bearing components are, so adding one is not structural BY ASLAIN'S OWN TEST.
         # Bumped 10 -> 11 when "scale" and "progressMode" became inline RadioButtonGroups
         # instead of Dropdowns. A control's `type` IS the second element of
         # _settingsStructure's (varName, type, domain) tuple, so this one is genuinely
@@ -268,7 +264,24 @@ def _template():
         # silent no-op.) The accompanying value reset is harmless here: the index semantics
         # are unchanged (0/1 mean exactly what they did as Dropdown indices), and init()'s
         # merge-forward migration carries the user's choice across anyway.
-        "settingsVersion": 11,
+        # Bumped 11 -> 12 when two more `Empty` spacers (before progressMode, before the
+        # "Position" sub-header) were added to column2. CORRECTION to the "RESOLVED" note
+        # above -- that note is true but IRRELEVANT to whether an existing install needs a
+        # bump: setModTemplate (the only call that can change a stored template's ROW
+        # COUNT) is only invoked from OUR OWN init() when getModSettings() returns falsy
+        # (a version bump or a fresh install). On an existing, same-version install,
+        # getModSettings() returns the SAVED dict, so setModTemplate is never called at
+        # all and the on-disk template keeps its OLD (shorter) column2 forever.
+        # _sync_template_text then walks that stale, now length-mismatched stored list
+        # POSITIONALLY against the new (longer) COL2_KEYS -- every row after the first new
+        # spacer got the WRONG label/tooltip (live regression: "Layout" rendered twice,
+        # "Scale" bled onto the Layout and Position rows). Same asymmetry as text-only
+        # removals (see the earlier correction) -- the sync can rewrite a row's text, but
+        # it can never ADD a row, so any row-count change owes a bump regardless of
+        # Aslain's own structural signature. Values are untouched by this bump (no varName
+        # added/removed), so init()'s merge-forward migration below carries every user's
+        # settings across losslessly.
+        "settingsVersion": 12,
         "column1": [
             # CATEGORY "Modes" -- the seven per-mode toggles, order per spec: Research,
             # Field Modifications, Tier XI, Upgrades, Elite Rewards, Elite System, Fully
@@ -303,6 +316,9 @@ def _template():
                 "tooltip": t["showPercent"]["tooltip"],
                 "varName": "showPercent",
             },
+            # Breathing room before the Progress Mode control. Textless/varName-less, so
+            # settings_i18n.COL2_KEYS holds a SPACER sentinel in this slot too.
+            {"type": "Empty", "height": 20},
             # Progress-mode selector: 0 = Current, 1 = Current / Required. An INLINE
             # RadioButtonGroup -- both options visible as one horizontal row
             # ([x] Current  [ ] Current / Required) instead of a collapsed Dropdown. Its
@@ -345,6 +361,9 @@ def _template():
                 "tooltip": t["scale"]["tooltip"],
                 "varName": "scale",
             },
+            # Breathing room before the Position sub-section. Textless/varName-less, so
+            # settings_i18n.COL2_KEYS holds a SPACER sentinel in this slot too.
+            {"type": "Empty", "height": 20},
             # Sub-header for the two steppers (this Label DOES carry a tooltip -- it's the
             # one place the Ctrl+drag hint lives).
             _label(t, "position"),
@@ -384,7 +403,15 @@ def _sync_template_text(api):
     lockstep with settings_i18n's column key order (Labels carry no varName) and overwrites
     each entry's text/tooltip from panel_text(), saving only if something changed.
     Idempotent: a no-op on a fresh install (text already matches). Guarded; all changes are
-    text-only so no settingsVersion bump is involved."""
+    text-only so no settingsVersion bump is involved for a length-MATCHED column.
+
+    A stored column whose length doesn't match its COL*_KEYS tuple is SKIPPED outright
+    (never zipped) -- that mismatch means a row was added/removed since this template was
+    last written to disk without a settingsVersion bump forcing setModTemplate to reshape
+    it (see the settingsVersion 11->12 changelog in _template()). Walking a length-
+    mismatched column positionally is exactly what corrupted every label/tooltip past the
+    first inserted spacer in that regression: rewrite the row count via a bump instead of
+    trying to text-sync across it."""
     try:
         tmpl = (getattr(api, "state", None) or {}).get("templates", {}).get(LINKAGE)
         if not isinstance(tmpl, dict):
@@ -393,7 +420,10 @@ def _sync_template_text(api):
         changed = False
         for col, keys in (("column1", settings_i18n.COL1_KEYS),
                           ("column2", settings_i18n.COL2_KEYS)):
-            for comp, key in zip(tmpl.get(col) or [], keys):
+            stored_col = tmpl.get(col) or []
+            if len(stored_col) != len(keys):
+                continue
+            for comp, key in zip(stored_col, keys):
                 rendered = t.get(key) if isinstance(comp, dict) else None
                 if not rendered:
                     continue

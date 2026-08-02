@@ -214,7 +214,7 @@ _MODES = {"showTechTree", "showFieldMods", "showPotentialTierXI", "showSkillTree
 def test_template_structure_and_english_text():
     tpl = mod_settings._template()
     # Structure the host owns is language-independent.
-    assert tpl["settingsVersion"] == 11          # bumped for the Dropdown -> radio change
+    assert tpl["settingsVersion"] == 12          # bumped for the two new column2 spacers
     assert tpl["modDisplayName"] == "Garage Progress Bar"   # brand, never translated
     varnames = [c["varName"] for col in _COLUMNS for c in tpl[col] if "varName" in c]
     assert set(varnames) == _VARNAMES
@@ -243,16 +243,18 @@ def test_template_structure_and_english_text():
         "showTechTree", "showFieldMods", "showPotentialTierXI", "showSkillTree",
         "showEliteRewards", "showElite", "showWhenComplete"]
     # Mod-invented text comes from the tables (English in the test env).
-    # column2 carries BOTH remaining categories, split by the Empty spacer at index 4.
+    # column2 carries BOTH remaining categories, split by Empty spacers.
     col2 = tpl["column2"]
     assert col2[0]["text"] == u"<b>Formatting</b>"                   # category header (bold)
     assert col2[1]["text"] == u"Ignore Free XP"                      # ignoreFreeXp
     assert col2[2]["text"] == u"Show Progress %"                     # showPercent
-    assert col2[3]["text"] == u"Progress Mode"                       # progressMode radios
-    assert col2[4]["type"] == "Empty"                                # group spacer
-    assert col2[5]["text"] == u"<b>Layout</b>"                       # category header (bold)
-    assert col2[6]["text"] == u"Scale"                               # scale radios
-    assert col2[7]["text"] == u"Position (px)"                       # sub-header, NOT bold
+    assert col2[3]["type"] == "Empty"                                # spacer before progressMode
+    assert col2[4]["text"] == u"Progress Mode"                       # progressMode radios
+    assert col2[5]["type"] == "Empty"                                # group spacer
+    assert col2[6]["text"] == u"<b>Layout</b>"                       # category header (bold)
+    assert col2[7]["text"] == u"Scale"                               # scale radios
+    assert col2[8]["type"] == "Empty"                                # spacer before Position
+    assert col2[9]["text"] == u"Position (px)"                       # sub-header, NOT bold
     # Per-mode checkbox labels come from WG's own strings (i18n.widget_labels(), which
     # fails soft to English feature names here).
     assert col1[1]["text"] == u"Research"                            # showTechTree
@@ -289,16 +291,16 @@ def test_sync_template_text_rewrites_stale_and_saves():
 def test_sync_template_text_rewrites_a_category_header_past_the_spacer():
     # The Label headers are walked positionally too (they carry no varName), so a stale
     # header caption must still be refreshed -- and its absent tooltip left absent. The
-    # "Layout" header sits AFTER the Empty spacer, so this also proves the SPACER sentinel
+    # "Layout" header sits AFTER an Empty spacer, so this also proves the SPACER sentinel
     # keeps COL2_KEYS aligned: without it this row would be relabelled "Scale".
     fresh = mod_settings._template()
-    fresh["column2"][5]["text"] = u"STALE HEADER"
+    fresh["column2"][6]["text"] = u"STALE HEADER"
     api = _FakeStateApi(fresh)
     mod_settings._sync_template_text(api)
-    assert fresh["column2"][5]["text"] == u"<b>Layout</b>"
-    assert "tooltip" not in fresh["column2"][5]
-    assert fresh["column2"][6]["text"] == u"Scale"      # neighbours unshifted
-    assert fresh["column2"][4] == {"type": "Empty", "height": 20}
+    assert fresh["column2"][6]["text"] == u"<b>Layout</b>"
+    assert "tooltip" not in fresh["column2"][6]
+    assert fresh["column2"][7]["text"] == u"Scale"      # neighbours unshifted
+    assert fresh["column2"][5] == {"type": "Empty", "height": 20}
     assert api.saved == 1
 
 
@@ -317,14 +319,41 @@ def test_sync_template_text_is_idempotent_over_the_bold_headers():
     assert api.saved == 0                    # pass 2: still no write (not oscillating)
     assert fresh["column1"][0]["text"] == u"<b>Modes</b>"
     assert fresh["column2"][0]["text"] == u"<b>Formatting</b>"
-    assert fresh["column2"][5]["text"] == u"<b>Layout</b>"
-    assert fresh["column2"][7]["text"] == u"Position (px)"   # sub-header still plain
+    assert fresh["column2"][6]["text"] == u"<b>Layout</b>"
+    assert fresh["column2"][9]["text"] == u"Position (px)"   # sub-header still plain
 
 
 def test_sync_template_text_noop_when_current():
     api = _FakeStateApi(mod_settings._template())
     mod_settings._sync_template_text(api)
     assert api.saved == 0                    # already current -> no write
+
+
+def test_sync_template_text_skips_a_length_mismatched_stored_column():
+    # THE regression guard: an EXISTING install's stored column2 can be SHORTER than the
+    # live COL2_KEYS whenever a row was added without a settingsVersion bump forcing
+    # setModTemplate to reshape it (init() only calls setModTemplate on a bump/fresh
+    # install -- see the settingsVersion 11->12 changelog in _template()). Walking that
+    # shorter list positionally against the longer COL2_KEYS used to relabel every row
+    # past the divergence point ("Layout" rendered twice, "Scale" bleeding onto the
+    # Layout/Position rows). Simulate the stale stored shape by removing the two new
+    # Empty spacers, and require _sync_template_text to leave every remaining row
+    # untouched rather than mislabel it.
+    stale = mod_settings._template()
+    stale_col2 = stale["column2"]
+    before = [dict(c) for c in stale_col2]     # snapshot for the untouched-ness check
+    del stale_col2[8]   # the spacer before "position"
+    del stale_col2[3]   # the spacer before "progressMode"
+    assert len(stale_col2) == len(mod_settings.settings_i18n.COL2_KEYS) - 2
+
+    api = _FakeStateApi(stale)
+    mod_settings._sync_template_text(api)
+
+    assert api.saved == 0                     # column2 skipped outright -> no write
+    # Every surviving row keeps its ORIGINAL text/tooltip -- none of the corruption the
+    # live regression produced (no stray "Layout"/"Scale" bleed-through).
+    remaining = [c for i, c in enumerate(before) if i not in (3, 8)]
+    assert stale_col2 == remaining
 
 
 def test_sync_template_text_guards_missing_template():

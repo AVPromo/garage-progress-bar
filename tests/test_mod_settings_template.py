@@ -32,14 +32,20 @@ def _col1():
 
 # --- version ----------------------------------------------------------------
 
-def test_settings_version_is_11():
+def test_settings_version_is_12():
     # Bumped 9 -> 10 when the panel was restructured into three named categories and the
     # showBar master was REMOVED (the restructure alone wouldn't need it -- column identity
     # and masterVarName are absent from Aslain's template signature -- but dropping a
     # varName does), then 10 -> 11 when scale/progressMode became inline RadioButtonGroups:
     # a control's `type` IS part of that signature, so without the bump setModTemplate
-    # keeps the STORED template and the radios never appear.
-    assert M._template()["settingsVersion"] == 11
+    # keeps the STORED template and the radios never appear. Then 11 -> 12 when two more
+    # `Empty` spacers were added to column2: a row-count change is NOT structural to
+    # Aslain's own signature, but our init() only calls setModTemplate (the one thing that
+    # can reshape a STORED template) on a bump/fresh install -- without it, an existing
+    # install's stored column2 keeps its old (shorter) shape forever, and
+    # _sync_template_text's positional zip against the new (longer) COL2_KEYS then
+    # mislabels every row past the first new spacer (live regression).
+    assert M._template()["settingsVersion"] == 12
 
 
 # --- category headers -------------------------------------------------------
@@ -57,7 +63,7 @@ def test_each_category_opens_with_a_bold_label_header():
     # (column, index, text) -- Formatting and Layout share column2, split by the spacer.
     for col, idx, text in (("column1", 0, u"Modes"),
                            ("column2", 0, u"Formatting"),
-                           ("column2", 5, u"Layout")):
+                           ("column2", 6, u"Layout")):
         head = tpl[col][idx]
         assert head["type"] == "Label"
         # Bold, wrapped by settings_i18n.render_panel (MSA Labels render HTML).
@@ -71,7 +77,7 @@ def test_each_category_opens_with_a_bold_label_header():
 def test_position_subheader_stays_plain():
     # A level BELOW the categories: bolding it too would flatten the hierarchy the
     # spacer + headers create. It keeps its plain text AND its tooltip.
-    sub = M._template()["column2"][7]
+    sub = M._template()["column2"][9]
     assert sub["type"] == "Label"
     assert sub["text"] == u"Position (px)"
     assert "<b>" not in sub["text"]
@@ -82,8 +88,18 @@ def test_position_subheader_stays_plain():
 def test_empty_spacer_splits_the_two_column2_groups():
     # 20px is Aslain's own createEmpty default. It sits between the last Formatting
     # control and the Layout header, and carries neither text nor varName.
-    spacer = M._template()["column2"][4]
+    spacer = M._template()["column2"][5]
     assert spacer == {"type": "Empty", "height": 20}
+
+
+def test_empty_spacers_precede_progress_mode_and_position():
+    # Two more breathing-room spacers: immediately before the progressMode radio group,
+    # and immediately before the "Position" sub-header.
+    col2 = M._template()["column2"]
+    assert col2[3] == {"type": "Empty", "height": 20}
+    assert col2[4]["varName"] == "progressMode"
+    assert col2[8] == {"type": "Empty", "height": 20}
+    assert col2[9]["text"] == u"Position (px)"
 
 
 # --- modes (column1) --------------------------------------------------------
@@ -121,13 +137,15 @@ def test_no_show_bar_leftover():
 
 def test_formatting_group_order_and_standalone():
     # Per spec: ignoreFreeXp, showPercent, progressMode -- none of them gate visibility.
+    # A spacer (no varName) sits between showPercent and progressMode.
     col2 = M._template()["column2"]
-    assert [c.get("varName") for c in col2[1:4]] == [
-        "ignoreFreeXp", "showPercent", "progressMode"]
+    assert [c.get("varName") for c in col2[1:5]] == [
+        "ignoreFreeXp", "showPercent", None, "progressMode"]
     assert col2[1]["type"] == "CheckBox" and col2[1]["value"] is False
     assert col2[2]["type"] == "CheckBox" and col2[2]["value"] is False
-    assert col2[3]["type"] == "RadioButtonGroup"
-    for c in col2[1:4]:
+    assert col2[3]["type"] == "Empty"
+    assert col2[4]["type"] == "RadioButtonGroup"
+    for c in col2[1:3] + col2[4:5]:
         assert "masterVarName" not in c
 
 
@@ -139,7 +157,7 @@ def test_formatting_group_order_and_standalone():
 
 def _selectors():
     col2 = _col2()
-    return {"progressMode": col2[3], "scale": col2[6]}
+    return {"progressMode": col2[4], "scale": col2[7]}
 
 
 def test_index_selectors_are_inline_radio_button_groups():
@@ -222,26 +240,56 @@ def test_col1_keys_match_template_wire_order():
 
 
 def test_col2_keys_match_template_wire_order():
-    # column2 holds BOTH the Formatting and Layout groups, so its key tuple covers three
-    # textless rows: the SPACER sentinel for the Empty, plus the two Label headers and the
+    # column2 holds BOTH the Formatting and Layout groups, so its key tuple covers the
+    # SPACER sentinels for the three `Empty` rows, plus the two Label headers and the
     # "position" sub-header (which do carry text but no varName).
     from wgmod_research.adapter import settings_i18n as S
     col2 = _col2()
     assert list(S.COL2_KEYS) == [
-        "formatting", "ignoreFreeXp", "showPercent", "progressMode",
-        S.SPACER, "layout", "scale", "position", "posX", "posY"]
+        "formatting", "ignoreFreeXp", "showPercent", S.SPACER, "progressMode",
+        S.SPACER, "layout", "scale", S.SPACER, "position", "posX", "posY"]
     # THE alignment guard: _sync_template_text zips these two sequences positionally, so
     # a length mismatch or a shifted slot silently relabels the wrong controls.
     assert len(col2) == len(S.COL2_KEYS)
     assert [c.get("varName") for c in col2] == [
-        None, "ignoreFreeXp", "showPercent", "progressMode",
-        None, None, "scale", None, "posX", "posY"]
+        None, "ignoreFreeXp", "showPercent", None, "progressMode",
+        None, None, "scale", None, None, "posX", "posY"]
     assert [c["type"] for c in col2] == [
-        "Label", "CheckBox", "CheckBox", "RadioButtonGroup",
-        "Empty", "Label", "RadioButtonGroup", "Label",
+        "Label", "CheckBox", "CheckBox", "Empty", "RadioButtonGroup",
+        "Empty", "Label", "RadioButtonGroup", "Empty", "Label",
         "NumericStepper", "NumericStepper"]
-    # The SPACER sentinel lines up with the Empty row and nothing else.
-    assert S.COL2_KEYS.index(S.SPACER) == 4
+    # Every SPACER sentinel lines up with an Empty row and nothing else.
+    spacer_idxs = [i for i, k in enumerate(S.COL2_KEYS) if k is S.SPACER]
+    assert spacer_idxs == [3, 5, 8]
+    assert all(col2[i]["type"] == "Empty" for i in spacer_idxs)
+
+
+def test_columns_stay_structurally_index_aligned_with_col_keys():
+    # A STRUCTURAL invariant, deliberately not a hardcoded index list (unlike the tests
+    # above): whatever shape _template() and COL1_KEYS/COL2_KEYS take, the two must stay
+    # in positional lockstep, because _sync_template_text zips them together on every
+    # existing install. This is what a future spacer insertion (or any row add/remove)
+    # must keep true, regardless of exactly where the new row lands.
+    from wgmod_research.adapter import settings_i18n as S
+    tpl = M._template()
+    for col, keys in (("column1", S.COL1_KEYS), ("column2", S.COL2_KEYS)):
+        comps = tpl[col]
+        assert len(comps) == len(keys), (
+            "%s has %d rows but %d keys -- _sync_template_text would misalign every "
+            "row past the first divergence" % (col, len(comps), len(keys)))
+        for i, (comp, key) in enumerate(zip(comps, keys)):
+            if key is S.SPACER:
+                assert comp["type"] == "Empty", (
+                    "%s[%d] should be the Empty spacer, got %r" % (col, i, comp["type"]))
+            elif "varName" in comp:
+                assert comp["varName"] == key, (
+                    "%s[%d] varName %r != key %r" % (col, i, comp["varName"], key))
+            else:
+                # A varName-less, non-spacer row (a Label header/sub-header): must not
+                # itself be an Empty row masquerading as a labelled control.
+                assert comp["type"] != "Empty", (
+                    "%s[%d] is an untracked Empty -- add a SPACER for it in %s" % (
+                        col, i, "COL1_KEYS" if col == "column1" else "COL2_KEYS"))
 
 
 def test_spacer_sentinel_is_skipped_by_both_consumers():

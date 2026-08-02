@@ -59,12 +59,13 @@ _FEATURE_EN = {
     u"showPotentialTierXI": u"Tier XI",
 }
 
-# Placeholder for a template row that carries NO text of its own -- currently the `Empty`
-# spacer between the Formatting and Layout groups in column2. _sync_template_text zips
-# these key tuples against the STORED components POSITIONALLY, so a textless row must still
-# occupy a slot: without it every key after the spacer would shift by one and silently
-# relabel the wrong controls. A module-level sentinel (not a bare None literal) so the
-# intent reads at the call site. Both consumers skip it -- see render_panel below and
+# Placeholder for a template row that carries NO text of its own -- the three `Empty`
+# spacers in column2 (between the Formatting and Layout groups, before the progressMode
+# radio group, and before the "Position" sub-header). _sync_template_text zips these key
+# tuples against the STORED components POSITIONALLY, so a textless row must still occupy a
+# slot: without it every key after the spacer would shift by one and silently relabel the
+# wrong controls. A module-level sentinel (not a bare None literal) so the intent reads at
+# the call site. Both consumers skip it -- see render_panel below and
 # mod_settings._sync_template_text (its ``t.get(key)`` yields None -> continue).
 SPACER = None
 
@@ -85,8 +86,8 @@ HEADER_KEYS = frozenset((u"modes", u"formatting", u"layout"))
 # mod_settings._template()). The order here MUST match the wire order in _template().
 COL1_KEYS = (u"modes", u"showTechTree", u"showFieldMods", u"showPotentialTierXI",
              u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete")
-COL2_KEYS = (u"formatting", u"ignoreFreeXp", u"showPercent", u"progressMode",
-             SPACER, u"layout", u"scale", u"position", u"posX", u"posY")
+COL2_KEYS = (u"formatting", u"ignoreFreeXp", u"showPercent", SPACER, u"progressMode",
+             SPACER, u"layout", u"scale", SPACER, u"position", u"posX", u"posY")
 
 
 def _norm(code):
