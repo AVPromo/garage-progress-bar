@@ -18,7 +18,7 @@ scale/ticks/fill axis with a single segment (fill_free = 0).
 import copy
 
 from wgmod_research.domain import types as t
-from wgmod_research.domain.constants import Category
+from wgmod_research.domain.constants import Category, FIELD_SEP, ROW_SEP
 from wgmod_research.domain.resolvers import (techtree, fieldmods, elite, skilltree,
                                              potential, complete)
 
@@ -203,6 +203,91 @@ def _b_elite(snapshot, ctx, enabled):
 _BUILDERS = (_b_tech, _b_skill, _b_field, _b_potential, _b_elite_rewards, _b_elite)
 
 
+# --- COMPLETE: the per-category item breakdown ----------------------------------------
+# Each finished category already rides as one ProgressionStep in avail_upgrades; its
+# (otherwise unused) `description` field carries a packed per-item breakdown that the
+# widget renders as the tooltip BODY, between the header and the XP total. Rows are joined
+# by ROW_SEP, fields within a row by FIELD_SEP (the same unit separator the buff lines
+# use). Uniform FOUR fields per row -- the category decides how field0/field3 read:
+#
+#   research       icon url | item name          | xp | ""
+#   fieldmods      level    | mod title          | xp | ""
+#   skilltree      icon url | final upgrade name | xp | ""
+#   elite_rewards  icon url | reward label       | xp | required elite level
+#   elite          (no rows -- the grade band has no per-item breakdown)
+#
+# This is DISPLAY data, not the COMPLETE gate, so unlike resolvers/complete it fails SOFT:
+# an unreadable source yields "" and the widget falls back to today's icon+title+total
+# tooltip.
+
+def _row(*fields):
+    return FIELD_SEP.join(u"%s" % f for f in fields)
+
+
+def _rows_research(s):
+    # Researched entries only, and only PRICED ones: a 0-XP entry is a default/stock
+    # module nobody ever paid for, which would read as a bogus free line. RAW xp_cost, not
+    # xp_cost_effective -- COMPLETE reports what the category cost, never a per-player
+    # blueprint rebate (same rule as the category totals, see resolvers/complete).
+    return [_row(u.icon, u.name, int(getattr(u, "xp_cost", 0) or 0), u"")
+            for u in (s.tech_unlocks or [])
+            if getattr(u, "researched", False) and int(getattr(u, "xp_cost", 0) or 0) > 0]
+
+
+def _rows_fieldmods(s):
+    # One row per level, ascending. A multi-pick level is titled by the VARIANT the player
+    # chose (the base mod's own name is generic and repeats across levels); no/unreadable
+    # selection -> the single name. field3 is unused here: the chosen variant is conveyed by
+    # BEING the title, so an extra "selected" marker beside it was redundant (owner call
+    # 2026-08-02). selected_idx still drives the naming, so the reader keeps it.
+    out = []
+    for st in sorted(s.field_mod_steps or [], key=lambda x: getattr(x, "level", 0)):
+        opts = getattr(st, "options", None) or []
+        idx = getattr(st, "selected_idx", -1)
+        idx = -1 if idx is None else int(idx)
+        pick = opts[idx] if 0 <= idx < len(opts) else u""
+        out.append(_row(int(getattr(st, "level", 0) or 0), pick or st.name,
+                        int(getattr(st, "xp_cost", 0) or 0), u""))
+    return out
+
+
+def _rows_skilltree(s):
+    # The FINAL upgrade only: the tree's signature node is the one the snapshot carries
+    # per-node metadata for (the rest are a bare count).
+    if not s.skilltree_final_name:
+        return []
+    return [_row(s.skilltree_final_icon, s.skilltree_final_name,
+                 int(s.skilltree_final_xp or 0), u"")]
+
+
+def _rows_rewards(s):
+    # One row per milestone reward, priced at the CUMULATIVE combat XP of its own level
+    # (the same elite_level_xp lookup the category total does for the last reward).
+    lvl_xp = s.elite_level_xp or {}
+    return [_row(r.icon, r.label, int(lvl_xp.get(r.level, 0) or 0), int(r.level or 0))
+            for r in (s.elite_rewards or [])]
+
+
+_COMPLETE_ROWS = {
+    t.Mode.TECH_TREE: _rows_research,
+    t.Mode.FIELD_MODS: _rows_fieldmods,
+    t.Mode.SKILL_TREE: _rows_skilltree,
+    t.Mode.ELITE_REWARDS: _rows_rewards,
+}
+
+
+def _complete_effect(snapshot, mode):
+    """Packed breakdown rows for one finished category, or u"" (no breakdown for this
+    category, nothing to list, or the source was unreadable)."""
+    fn = _COMPLETE_ROWS.get(mode)
+    if fn is None:
+        return u""
+    try:
+        return ROW_SEP.join(fn(snapshot))
+    except Exception:
+        return u""
+
+
 def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     """`enabled` is the set of Mode strings the user has left ON (None = all on).
 
@@ -265,10 +350,20 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
         # TOTAL raw XP cost, which the widget renders as the below-bar icon row + tooltips.
         # progress_current is the summed cost (the header's upper-right figure);
         # progress_required stays 0 -- nothing is left to require.
+        #
+        # Header counter: field mods and the skill tree are MUTUALLY EXCLUSIVE (a tier-XI
+        # vehicle reads field mods 0/0), so on a tier XI the two counter fields would
+        # carry nothing. Reuse them for the skill-tree node count instead -- the widget
+        # renders it exactly as SKILL_TREE mode does, gated on the skill-tree category
+        # actually being in the pushed row.
+        if snapshot.skilltree_total > 0:
+            cnt_done, cnt_total = snapshot.skilltree_done, snapshot.skilltree_total
+        else:
+            cnt_done, cnt_total = fm_done, fm_total
         return t.ResearchProgressModel(
             mode=t.Mode.COMPLETE, scale_min=0, scale_max=1,
             fill_vehicle=1, fill_free=0, ticks=[],
-            fieldmods_done=fm_done, fieldmods_total=fm_total, vehicle_class=veh_class,
+            fieldmods_done=cnt_done, fieldmods_total=cnt_total, vehicle_class=veh_class,
             spendable_xp=spendable,
             # The current grade emblem, so the ELITE category's icon can be this
             # vehicle's own badge (the elite systems have no section glyph of their own).
@@ -277,8 +372,11 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
             # the vehicle reached it, so the cap IS its elite level (per-vehicle -- the cap
             # comes from that vehicle's own grade list, see prestige_read).
             elite_max_level=snapshot.elite_max_level,
+            # name/icon stay empty -- the widget derives both from `category`; the
+            # description slot carries this category's per-item breakdown rows.
             avail_upgrades=[t.ProgressionStep(step_id=0, name=u"", icon=u"", xp_cost=xp,
-                                              unlocked=True, category=mode, done=True)
+                                              unlocked=True, category=mode, done=True,
+                                              description=_complete_effect(snapshot, mode))
                             for (mode, xp) in done_cats],
             progress_current=sum(xp for (_m, xp) in done_cats), progress_required=0,
             **est)

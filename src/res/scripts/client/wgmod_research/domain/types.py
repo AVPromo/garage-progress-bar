@@ -135,7 +135,7 @@ class ProgressionStep(object):
     """A field-modification step (post-progression tree node, paid with XP)."""
     def __init__(self, step_id, name, icon, xp_cost, unlocked, level=0,
                  options=None, description="", option_effects=None, category="",
-                 done=False):
+                 done=False, selected_idx=-1):
         self.step_id = step_id
         self.name = name
         self.icon = icon
@@ -147,6 +147,11 @@ class ProgressionStep(object):
         self.category = category
         # variant names of the paired choice (MultiModsItem) at this level.
         self.options = options or []
+        # Index into `options` of the variant the player actually picked, -1 when the
+        # level has no pair, nothing was picked, or the (live-gated) read failed. Only
+        # the COMPLETE breakdown consumes it -- it names the CHOSEN variant instead of
+        # the generic base-mod name that repeats across levels.
+        self.selected_idx = -1 if selected_idx is None else int(selected_idx)
         # Human-readable effect/bonus text (KPI lines, newline-joined), e.g.
         # "+1% to concealment". Empty when the action exposes no labeled KPI.
         self.description = description

@@ -1316,6 +1316,118 @@
 #wgmod-root.wg-colorblind .wg-buff-neg {
     color: #ffaa4c;
 }
+
+/* --- COMPLETE category tooltip: the per-item breakdown body -------------------------
+   A list of what a finished category is actually made of, between the tooltip header and
+   its XP total. Two row shapes (JS completeIconRowHtml / completeHexRowHtml), one layout:
+   a left column (art box or hexagon) beside a two-line text column (name, then cost).
+   This is the MIRROR of the header block, whose .wg-tip-icon is pinned top-RIGHT and out
+   of flow -- so the icon rules below pull that same box back INTO flow. */
+#wgmod-root .wg-tip-items {
+    margin-top: 5rem;
+}
+/* The row is the stem's containing block (position:relative). It carries NO padding or
+   margin of its own -- the gap to the next row lives on the text column (.wg-tip-item-txt
+   margin-bottom) so it is part of the row's CONTENT height. That is what makes the
+   connector exact: measured in-client, Coherent resolves an absolutely positioned child's
+   `height:100%` against the CONTENT box, not the padding box the spec calls for, so a gap
+   expressed as row padding left every stem short by exactly the gap. With the gap inside
+   the content flow, `height:100%` reaches the next hexagon under EITHER interpretation --
+   and it stays correct when the gap changes, which a hardcoded stem height would not. */
+#wgmod-root .wg-tip-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+}
+/* Left art box for a research / skill-tree / reward row. Emitted by bgIconHtml, so it
+   also carries .wg-tip-icon (absolute, top-right, 65rem square) -- restated here into a
+   normal in-flow flex item. Equal specificity with .wg-tip-icon, so this MUST stay after
+   it in source order. */
+#wgmod-root .wg-tip-item-ico {
+    position: relative;
+    top: 0;
+    right: auto;
+    flex: 0 0 auto;
+    width: 30rem;
+    height: 30rem;
+    margin-right: 8rem;
+    background-position: center;
+}
+/* Left hexagon for a field-mod row -- the tooltip hex badge (.wg-tip-hex supplies the
+   clip-path ring + tan numeral), shrunk to list size and given its own positioning
+   context (its ::before dark fill is absolute) plus a stacking order ABOVE the stem it
+   sits on. Also after .wg-tip-hex in source order (equal specificity). */
+#wgmod-root .wg-tip-item-hex {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+    width: 20rem;
+    height: 22rem;
+    margin-right: 10rem;
+}
+#wgmod-root .wg-tip-item-hex span {
+    font-size: 10rem;
+}
+/* The chain connector: the bar's own de-crowding stem (.wg-tick-stem -- a plain FILLED
+   div; Coherent ignores a border on the clip-path element and won't render a gradient),
+   re-aimed at the hexagon column's centre and spanning the whole row so it runs from one
+   hexagon to the next (the opaque hexagon covers its own segment). Not drawn on the last
+   row. min-height is a floor in case `height:100%` can't resolve, so the chain degrades
+   to a visible stub rather than vanishing. */
+#wgmod-root .wg-tip-item-stem {
+    left: 10rem;                /* == half .wg-tip-item-hex's width -> the hexagon's centre */
+    right: auto;
+    top: 0;
+    width: 1rem;
+    margin-left: -0.5rem;
+    height: 100%;
+    min-height: 24rem;
+}
+/* margin-bottom IS the inter-row gap (see .wg-tip-item above -- it must sit inside the
+   row's content height for the connector to reach). Keep the two in lockstep: this is the
+   single place the list's row spacing is defined. */
+#wgmod-root .wg-tip-item-txt {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 9rem;
+}
+/* Line 1: the item's name, in the body-title tone (a notch under .wg-tip-name -- these
+   are list entries under a title, not titles). A plain block: it carries text only (the
+   field-mod "selected" marker that once rode here is gone -- the title IS the chosen
+   variant). Anything inline added back here would need the flex-row treatment, since
+   Coherent blockifies a bare inline span. */
+#wgmod-root .wg-tip-item-name {
+    font-size: 14rem;
+    font-weight: 600;
+    color: #ede6d9;
+    opacity: 0.95;
+    line-height: 1.15;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+/* Line 2: what it cost, in the currency tan the XP figures use. */
+#wgmod-root .wg-tip-item-xp {
+    display: flex;
+    align-items: center;
+    font-size: 13rem;
+    font-weight: 700;
+    color: #ecca9d;
+}
+/* The currency glyph reads oversized against these list rows (they sit a size below the
+   headline cost lines the 14rem base is tuned for) -- 3rem smaller here ONLY. Scoped to
+   the row, so every other tooltip's glyph and the header's own .wg-xp-ico are untouched. */
+#wgmod-root .wg-tip-item-xp .wg-tip-xp-ico {
+    width: 11rem;
+    height: 11rem;
+}
+/* Dim trailing qualifier -- a reward's required elite level, beside its cost. The existing
+   dim caption token, not a new colour. */
+#wgmod-root .wg-tip-item-dim {
+    margin-left: 6rem;
+    font-size: 12rem;
+    font-weight: 400;
+    color: #8e867d;
+}
 /* Section divider -- the SAME divider art WG's carousel vehicle tooltip uses to
    split its sections (its .Tooltip_section::after draws
    img://gui/maps/icons/tooltip/divider.png at center/contain, ~9rem tall), so the
@@ -1976,6 +2088,51 @@
 #wgmod-root.wg-large .wg-tip-variant-eff {
     margin-top: 7.5rem;
     font-size: 22.5rem;
+}
+/* COMPLETE per-item breakdown rows -- 1.5x the Default block above (the stem's
+   height:100% and the icon boxes' background-size are ratios, so they carry over). */
+#wgmod-root.wg-large .wg-tip-items {
+    margin-top: 7.5rem;
+}
+/* The inter-row gap (Default 9rem). It rides the text column, not the row, so the
+   connector's height:100% keeps reaching the next hexagon at this scale too -- see the
+   Default .wg-tip-item comment. */
+#wgmod-root.wg-large .wg-tip-item-txt {
+    margin-bottom: 13.5rem;
+}
+#wgmod-root.wg-large .wg-tip-item-ico {
+    width: 45rem;
+    height: 45rem;
+    margin-right: 12rem;
+}
+#wgmod-root.wg-large .wg-tip-item-hex {
+    width: 30rem;
+    height: 33rem;
+    margin-right: 15rem;
+}
+#wgmod-root.wg-large .wg-tip-item-hex span {
+    font-size: 15rem;
+}
+#wgmod-root.wg-large .wg-tip-item-stem {
+    left: 15rem;
+    width: 1.5rem;
+    margin-left: -0.75rem;
+    min-height: 36rem;
+}
+#wgmod-root.wg-large .wg-tip-item-name {
+    font-size: 21rem;
+}
+#wgmod-root.wg-large .wg-tip-item-xp {
+    font-size: 19.5rem;
+}
+/* 1.5x the Default 11rem (i.e. the Large 21rem base glyph less the same 4.5rem trim). */
+#wgmod-root.wg-large .wg-tip-item-xp .wg-tip-xp-ico {
+    width: 16.5rem;
+    height: 16.5rem;
+}
+#wgmod-root.wg-large .wg-tip-item-dim {
+    margin-left: 9rem;
+    font-size: 18rem;
 }
 
 /* --- tier-XI upgrade chips + skill-tree final tick + next-available row ------- */

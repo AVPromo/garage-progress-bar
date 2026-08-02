@@ -40,6 +40,18 @@ use the **gpb-debug-repl** skill.
     this vehicle report 0 / no Research category" without opening the client.
 - `post_progression_read` / `skill_tree_read` ← `veh.postProgression` (`isVehSkillTree`,
   `iterOrderedSteps`), effect text off `action._descriptor` / skill-tree `tooltips.description.dyn`.
+  - **Which VARIANT of a choice level the player bought** ← `MultiModsItem.isPurchased()` +
+    `getPurchasedIdx()` (0-based index into `.modifications`), declared in
+    `gui/veh_post_progression/models/modifications.py:185-231` (siblings: `getPurchasedID()`,
+    `getPurchasedModification()`). The reader already holds that item as `step.action` while
+    collecting `pairs_by_parent`, so this is a read off an object in hand, not a new lookup.
+    Consumed only by the COMPLETE per-level breakdown (`ProgressionStep.selected_idx`, -1 = none);
+    fully guarded — a failure degrades to the generic base-mod name. **Verified live** on
+    T110E5 (Tier X): 5 `MultiModsItem` steps, all purchased, `getPurchasedIdx()` returned real
+    indices incl. three index-0 cases, correct variant name rendered each time. Consumer must
+    range-check (`0 <= idx < len(opts)`), never truthy-test — index 0 is valid AND falsy.
+    Tier-XI skill-tree vehicles produce ZERO `MultiModsItem` steps, so this path is reachable
+    only on non-tier-XI elite vehicles.
 - `prestige_read` ← `gui.prestige.prestige_helpers` (`hasVehiclePrestige`, `getVehiclePrestige`,
   `prestigePointsToXP`, `mapGradeIDToUI`) + `ILobbyContext…prestigeConfig`.
 - `pricing_read.read_purchase_price` ← `items.getItemByCD(int_cd).buyPrices…getSignValue(CREDITS)`.

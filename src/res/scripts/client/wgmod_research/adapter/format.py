@@ -12,6 +12,7 @@ duck-typed stub is enough to test them).
 import re
 
 from wgmod_research._compat import LOG_CURRENT_EXCEPTION
+from wgmod_research.domain import constants as c
 
 
 _ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
@@ -210,8 +211,10 @@ def fill_kpi_placeholders(tmpl, action):
 # separator splits the fields WITHIN one line. U+001F (unit separator) never
 # appears in localized text, so it is unambiguous. The JS effectHtml mirrors
 # this exact shape; a line WITHOUT the separator is rendered as plain text
-# (back-compat for any non-KPI body line).
-KPI_FIELD_SEP = u"\x1f"
+# (back-compat for any non-KPI body line). ALIAS, not a second definition: the same
+# unit separator packs the COMPLETE per-category breakdown rows, so it has one home
+# (domain/constants) and one convention.
+KPI_FIELD_SEP = c.FIELD_SEP
 
 # WG's description templates wrap their HIGHLIGHTED run -- the figure, sometimes
 # figure + unit ("{colorTagOpen}{value0} HP{colorTagClose}") -- in a colour-tag pair

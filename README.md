@@ -17,7 +17,7 @@ stock progress bars. It updates live as you switch vehicles or earn XP.
 - **Tier XI exclusive rewards** — the milestone reward roadmap earned on Tier XI vehicles.
 - **Tier XI skill tree** — how many skill-tree upgrades you've unlocked out of the total.
 - **Potential Tier XI** — an opt-in projection on Tier X vehicles that have no Tier XI of their own, measuring your banked XP against the Tier XI unlock cost.
-- **Fully Progressed** — a golden bar once nothing is left to research, upgrade, or unlock, listing every finished progression type with its total XP cost.
+- **Fully Progressed** — a golden bar once nothing is left to research, upgrade, or unlock, listing every finished progression type with its total XP cost. Each type's tooltip itemizes what was completed and what each item cost: the researched items, every Field Modification level, the skill tree's final upgrade, and each exclusive reward with the level it unlocks at. On Tier XI vehicles the header carries the same unlocked/total skill counter the Tier XI skill tree bar shows.
 
 **Click the bar** to research modules, unlock the next vehicle, or apply Tier XI
 upgrades without leaving the Garage. **Hover** any tick or icon for a tooltip.
@@ -141,7 +141,7 @@ Building, deploying, testing, and the repo layout are documented in
 - **Ексклюзивні нагороди XI рівня** — дорожня карта нагород для техніки XI рівня.
 - **Дерево навичок XI рівня** — скільки вдосконалень дерева навичок відкрито із загальної кількості.
 - **Потенційний XI рівень** — опційна проекція для техніки X рівня, яка не має власного XI рівня: показує накопичений досвід відносно вартості відкриття XI рівня.
-- **Повністю пройдено** — золота смуга, коли вже нічого досліджувати, вдосконалювати чи відкривати: перелічує кожен завершений тип прогресу з підсумковою вартістю в досвіді.
+- **Повністю пройдено** — золота смуга, коли вже нічого досліджувати, вдосконалювати чи відкривати: перелічує кожен завершений тип прогресу з підсумковою вартістю в досвіді. Підказка кожного типу деталізує, що саме завершено і скільки це коштувало: досліджені елементи, кожен рівень Польових модифікацій, фінальне вдосконалення дерева навичок і кожну ексклюзивну нагороду з рівнем, на якому вона відкривається. На техніці XI рівня в заголовку показано той самий лічильник навичок, що й у смузі дерева навичок XI рівня.
 
 **Натисніть на смугу**, щоб досліджувати модулі, відкрити наступну техніку або
 застосувати вдосконалення XI рівня прямо з Ангара. **Наведіть** курсор на позначку

@@ -131,6 +131,16 @@ function completeCatIconFam(mode) {
     return CAT_ICON[mode] ? "wg-cat-fam-white" : "wg-cat-fam-emblem";
 }
 
+// Is `mode` one of the finished categories COMPLETE pushed? (Wulf-array aware, like
+// every other read of availUpgrades.) The header's skills counter is gated on it.
+function hasCompleteCat(arr, mode) {
+    for (let i = 0, n = arrLen(arr); i < n; i++) {
+        const u = arrGet(arr, i);
+        if (u && u.category === mode) return true;
+    }
+    return false;
+}
+
 // NB: the potential-Tier-XI milestone tick's glyph / "Tier XI" caption / class-name
 // title are stamped on the Python Tick in the bridge (_decorate_potential), NOT here --
 // marshalled tick objects are read-only in this widget, so JS-side writes wouldn't take.
@@ -599,6 +609,10 @@ function creditsHtml(price) {
 // tertiary row. All fields are escaped; the icon URL is only ever a background and
 // is gated on the img:// prefix (same guard as tickIconHtml).
 const BUFF_SEP = "\x1f";
+// ...and the RECORD separator that packs several such field-delimited rows into one
+// string field (Python domain/constants.ROW_SEP). Used by the COMPLETE per-category
+// breakdown, whose rows are a uniform 4 BUFF_SEP-delimited fields each.
+const ROW_SEP = "\x1e";
 // A skill-tree description sentence carries WG's own {colorTagOpen}...{colorTagClose}
 // highlight (the figure, sometimes figure + unit) as these sentinel control chars --
 // Python's format.HL_OPEN/HL_CLOSE, swapped in there because raw HTML from the model
@@ -1162,10 +1176,16 @@ function renderCompleteCats(nextEl, arr, curEmblem, eliteLevel, hotEl) {
         // (it's a bare box), so the elite path goes through eliteTipIconHtml -- the
         // string-building sibling of emblemNumber -- with `fam` kept as the extra class so
         // the box sizing + tipMain's .wg-tip-main-cat layout still apply.
+        // ...then, under that header, the category's per-item breakdown (what it is
+        // actually made of). CONCATENATED onto the header rather than passed as its own
+        // joinSections entry: the list belongs to the header it itemizes, so a divider
+        // between the two read as a false split (the one before the XP total stays).
+        // Absent/malformed -> the header renders exactly as it did before.
         tip.innerHTML = joinSections([
             tipMain(badgeFam ? eliteTipIconHtml(url, eliteLevel, fam, badgeFam)
                              : bgIconHtml(url, fam),
-                '<div class="wg-tip-name">' + escapeHtml(modeTitle(u.category)) + "</div>"),
+                '<div class="wg-tip-name">' + escapeHtml(modeTitle(u.category)) + "</div>") +
+            completeRowsHtml(u.category, u.effect),
             xpTotalHtml(u.xpRequired)]);
         box.appendChild(tip);
         nextEl.appendChild(box);
@@ -1173,6 +1193,63 @@ function renderCompleteCats(nextEl, arr, curEmblem, eliteLevel, hotEl) {
     }
     nextEl.style.display = chips.length ? "flex" : "none";
     if (hotEl) hotEl._wgChips = chips;
+}
+
+// The per-item breakdown body of a COMPLETE category tooltip: what the category is
+// actually made of, listed between the header (icon + category title) and the XP total.
+// Python packs it into the category's `effect` field as ROW_SEP-joined rows of exactly
+// four BUFF_SEP-delimited fields (see domain/builder._complete_effect); the CATEGORY
+// decides how field0/field3 read. Anything malformed or empty -> "" and joinSections
+// drops the whole section, leaving exactly today's icon+title+total tooltip.
+function completeRowsHtml(category, effect) {
+    const rows = splitLines(effect, ROW_SEP);
+    let h = "";
+    for (let i = 0; i < rows.length; i++) {
+        const f = rows[i].split(BUFF_SEP);
+        if (f.length < 4) continue;
+        h += (category === MODE.FIELD_MODS)
+            ? completeHexRowHtml(f, i === rows.length - 1)
+            : completeIconRowHtml(f, category);
+    }
+    return h ? '<div class="wg-tip-items">' + h + "</div>" : "";
+}
+
+// research / skilltree / elite_rewards row: the item's art on the LEFT (a box spanning
+// both text lines -- the mirror of tipMain's top-RIGHT pinned icon), its name on the
+// first line, its cost on the second. bgIconHtml builds the art box (the new
+// .wg-tip-item-ico modifier pulls it back into flow); the cost reuses fmtXp + xpIco.
+// elite_rewards additionally carries the elite level the reward is granted at, as a dim
+// suffix beside the cost -- the plural "Elite Levels" label + the number, the same
+// composition the grade-band tooltip uses (the client ships no numbered singular).
+function completeIconRowHtml(f, category) {
+    const lvl = category === MODE.ELITE_REWARDS ? (f[3] | 0) : 0;
+    const ico = (f[0] && f[0].indexOf("img://") === 0)
+        ? bgIconHtml(f[0], "wg-tip-item-ico") : "";
+    return '<div class="wg-tip-item">' + ico +
+        '<div class="wg-tip-item-txt">' +
+        '<div class="wg-tip-item-name">' + escapeHtml(f[1]) + "</div>" +
+        '<div class="wg-tip-item-xp">' + fmtXp(f[2] | 0) + xpIco(xpCurrencyIcon()) +
+        (lvl > 0 ? '<span class="wg-tip-item-dim">' +
+            escapeHtml(L("capEliteLevel", "Elite Levels")) + " " + lvl + "</span>" : "") +
+        "</div></div></div>";
+}
+
+// fieldmods row: a vertical hexagon CHAIN -- the same .wg-tip-hex badge the field-mod
+// tooltip icon uses (roman numeral inside), one per level, joined by the same filled-div
+// stem the bar's lane de-crowding draws (.wg-tick-stem; a border on the clip-path element
+// is ignored by Coherent and a gradient won't render). The stem is drawn on every row but
+// the last, BEHIND the hexagons, so consecutive rows form one continuous line. On a choice
+// level the title IS the variant the player picked (Python resolves it through
+// selected_idx), so it carries no extra marker -- field3 is unused for this category.
+function completeHexRowHtml(f, last) {
+    return '<div class="wg-tip-item wg-tip-item-fm">' +
+        (last ? "" : '<div class="wg-tick-stem wg-tip-item-stem"></div>') +
+        '<div class="wg-tip-hex wg-tip-item-hex"><span>' +
+        escapeHtml(romanize(f[0] | 0)) + "</span></div>" +
+        '<div class="wg-tip-item-txt">' +
+        '<div class="wg-tip-item-name">' + escapeHtml(f[1]) + "</div>" +
+        '<div class="wg-tip-item-xp">' + fmtXp(f[2] | 0) + xpIco(xpCurrencyIcon()) +
+        "</div></div></div>";
 }
 
 // A bare XP total (a COMPLETE category's full cost) -- shaped like creditsHtml, NOT
@@ -1804,15 +1881,35 @@ function render(model) {
         // progressCurrent). setXp() can't serve it: its fill args are the fake 0..1 axis.
         // progressRequired is 0, so setXpPct below keeps the "%" hidden -- there is
         // nothing left for a percentage to be OF.
-        root.querySelector(".wg-xp-ico").style.backgroundImage =
-            "url('" + xpCurrencyIcon() + "')";
         // Under the dev flag the pushed scalars belong to the REAL winner mode (this
         // vehicle isn't genuinely complete), so they'd contradict FAKE_CATS: swap in the
         // fake row's own sum, and zero the denominator exactly like a real COMPLETE model
         // does (progress_required = 0) so setXpPct below keeps the "%" hidden.
         if (FORCE_COMPLETE) { PROGRESS_CUR = FAKE_CATS_TOTAL; PROGRESS_REQ = 0; }
-        root.querySelector(".wg-xp-val").textContent = fmtXp(PROGRESS_CUR, ",");
-        hideXp2(root);
+        // Tier XI: field mods don't apply there, so Python reuses the two counter fields
+        // for the SKILL-TREE node count (builder._complete_model). Front it exactly like
+        // SKILL_TREE mode does -- counter glyph + n/m in the primary readout, the total-XP
+        // figure moved to the secondary pair. Gated on the skill-tree category actually
+        // being in the pushed row, so a stale counter can never front another vehicle.
+        const cats = FORCE_COMPLETE ? FAKE_CATS : data.availUpgrades;
+        if ((data.fieldModsTotal | 0) > 0 && hasCompleteCat(cats, MODE.SKILL_TREE)) {
+            root.querySelector(".wg-xp-ico").style.backgroundImage =
+                "url('" + SKILL_COUNTER_ICON + "')";
+            root.querySelector(".wg-xp-val").textContent =
+                (data.fieldModsDone || 0) + "/" + (data.fieldModsTotal || 0);
+            const xp2Val = root.querySelector(".wg-xp2-val");
+            const xp2Ico = root.querySelector(".wg-xp2-ico");
+            xp2Val.textContent = fmtXp(PROGRESS_CUR, ",");
+            xp2Ico.style.backgroundImage = "url('" + xpCurrencyIcon() + "')";
+            // "block", not "inline-block": Gameface rejects the latter set imperatively.
+            xp2Val.style.display = "block";
+            xp2Ico.style.display = "block";
+        } else {
+            root.querySelector(".wg-xp-ico").style.backgroundImage =
+                "url('" + xpCurrencyIcon() + "')";
+            root.querySelector(".wg-xp-val").textContent = fmtXp(PROGRESS_CUR, ",");
+            hideXp2(root);
+        }
     } else {
         setXp(root, data.fillVehicle, data.fillFree);
         hideXp2(root);

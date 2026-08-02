@@ -21,6 +21,18 @@ class Category(object):
     REWARD = "reward"        # a tier-exclusive milestone reward thumbnail
 
 
+# --- Packed multi-value string fields (the ONE delimiter convention) ------------------
+# Several model string fields carry more than one value, packed with control chars that
+# never occur in localized text. FIELD_SEP (U+001F, unit separator) splits the fields
+# WITHIN one record -- it is the same separator the KPI buff lines already use
+# (adapter/format.KPI_FIELD_SEP aliases this, so there is exactly one definition), and
+# ROW_SEP (U+001E, record separator) splits whole records. Used by the COMPLETE
+# per-category breakdown (builder._complete_effect -> UpgradeVM.effect), whose rows are a
+# uniform 4 fields each. Mirrored in WGModResearch.js as BUFF_SEP / ROW_SEP.
+FIELD_SEP = u"\x1f"
+ROW_SEP = u"\x1e"
+
+
 class GradeFamily(object):
     """Elite-Levels grade family id (EliteGrade.grade). PRESTIGE is the synthetic
     terminal MAX grade; UNDEFINED is the game's below-first-grade sentinel."""

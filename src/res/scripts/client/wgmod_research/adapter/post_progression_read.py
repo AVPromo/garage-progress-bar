@@ -52,6 +52,7 @@ def read_post_progression(veh):
         # repeats across levels; the pair is what distinguishes a level.)
         all_steps = list(pp.iterOrderedSteps())
         pairs_by_parent = {}
+        sel_by_parent = {}
         for step in all_steps:
             try:
                 if type(step.action).__name__ != "MultiModsItem":
@@ -60,6 +61,7 @@ def read_post_progression(veh):
                 if parent is None:
                     continue
                 pairs_by_parent[parent] = _pair_options(step.action)
+                sel_by_parent[parent] = _selected_idx(step.action)
             except Exception:
                 LOG_CURRENT_EXCEPTION()
                 continue
@@ -89,6 +91,7 @@ def read_post_progression(veh):
                     level=level,
                     options=[p[0] for p in pair],
                     option_effects=[p[1] for p in pair],
+                    selected_idx=sel_by_parent.get(step.stepID, -1),
                     description=_action_effect(step.action)))
             except Exception:
                 LOG_CURRENT_EXCEPTION()
@@ -97,6 +100,23 @@ def read_post_progression(veh):
     except Exception:
         LOG_CURRENT_EXCEPTION()
         return steps, fm_done, fm_total
+
+
+def _selected_idx(action):
+    """0-based index into a MultiModsItem's `modifications` of the variant the player
+    actually bought, or -1 when nothing is picked / the read fails.
+
+    `isPurchased()` / `getPurchasedIdx()` live on MultiModsItem
+    (gui/veh_post_progression/models/modifications.py). Both are live-gated, so the whole
+    read is guarded: a failure degrades to -1 and the COMPLETE breakdown falls back to
+    the single base-mod name -- it must never break the push."""
+    try:
+        if not action.isPurchased():
+            return -1
+        return int(action.getPurchasedIdx())
+    except Exception:
+        LOG_CURRENT_EXCEPTION()
+        return -1
 
 
 def _pair_options(action):
