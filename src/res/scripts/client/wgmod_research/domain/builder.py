@@ -189,7 +189,12 @@ def _b_elite_rewards(snapshot, ctx, enabled):
 
 
 def _b_elite(snapshot, ctx, enabled):
-    # Prestige grade-band progression (the fallback prestige view).
+    # Prestige grade-band progression (the fallback prestige view). Entry-gated on the
+    # "Exclude Elite System" setting -- like _b_potential, this FALLS THROUGH (returns
+    # None) rather than hiding, so a vehicle whose only remaining progression is the
+    # grade band shows COMPLETE instead once every other applicable category is done.
+    if ctx.get("exclude_elite_system"):
+        return None
     if not snapshot.has_prestige:
         return None
     band = elite.resolve_grade_band(snapshot)
@@ -288,7 +293,8 @@ def _complete_effect(snapshot, mode):
         return u""
 
 
-def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
+def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
+                exclude_elite_system=False):
     """`enabled` is the set of Mode strings the user has left ON (None = all on).
 
     `ignore_free_xp` (the "Ignore Free XP" setting) makes the bar behave as if the
@@ -300,6 +306,13 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     (techtree/fieldmods/potential) -- reads snapshot.free_xp, so no per-site logic is
     needed. The battles estimate is already combat-XP-only; elite modes already force
     fill_free = 0.
+
+    `exclude_elite_system` (the "Exclude Elite System" setting) suppresses Mode.ELITE
+    entirely: `_b_elite` falls through (like `_b_potential`) instead of winning, and
+    `complete.resolve` drops ELITE from its category gate, so a vehicle whose only
+    remaining progression is the grade band reaches COMPLETE instead. It is the
+    caller's job to make it effective only while showWhenComplete is also on --
+    build_model just honors whatever it's handed.
 
     The default mode is resolved by the usual priority chain (the first applicable mode
     in _BUILDERS); if that resolved mode is OFF, the bar is HIDDEN -- there is NO
@@ -328,7 +341,8 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     fm_total = snapshot.fieldmods_total
     veh_class = snapshot.vehicle_class
     ctx = {"fill_vehicle": fill_vehicle, "fill_free": fill_free, "spendable": spendable,
-           "est": est, "fm_done": fm_done, "fm_total": fm_total, "veh_class": veh_class}
+           "est": est, "fm_done": fm_done, "fm_total": fm_total, "veh_class": veh_class,
+           "exclude_elite_system": exclude_elite_system}
 
     def _placeholder(mode):
         # A model with no bar of its own, carrying only the shared fill/counter fields:
@@ -398,7 +412,7 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False):
     # empty, so a maxed-out prestige/skill-tree/rewards vehicle reaches COMPLETE too and
     # its finished categories can be reported. COMPLETE has no user toggle of its own
     # (bar_visible's show_when_complete governs it), so toggles don't apply here.
-    done_cats = complete.resolve(snapshot)
+    done_cats = complete.resolve(snapshot, exclude_elite_system=exclude_elite_system)
     if override and override in avail:
         # Player's explicit choice among the available modes -- honored even if the
         # priority default is disabled (override is drawn from `avail`, i.e. enabled).

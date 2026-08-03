@@ -11,9 +11,9 @@ Scope, deliberately narrow:
      ``i18n.widget_labels()`` (``FEATURE_WG`` maps each checkbox → its widget-labels key),
      so they match the game exactly in every language and never drift.
   2. **Mod-invented labels** (the three category-header Labels "Modes"/"Formatting"/
-     "Layout", the ``showWhenComplete`` and ``ignoreFreeXp`` toggles, the "Position" section
-     Label, the two position steppers) — bundled ``{lang: {key: label}}`` tables here,
-     English master + per-key fallback.
+     "Layout", the ``showWhenComplete``/``excludeEliteSystem``/``ignoreFreeXp`` toggles,
+     the "Position" section Label, the two position steppers) — bundled
+     ``{lang: {key: label}}`` tables here, English master + per-key fallback.
 * **Tooltips are NOT localized.** Every control's tooltip (header + body) is fixed English
   (``_TOOLTIPS_EN``) — it's explanatory help, not a setting, and has no WG string to reuse.
   It is never translated and never routed through i18n. The three category headers are the
@@ -85,7 +85,8 @@ HEADER_KEYS = frozenset((u"modes", u"formatting", u"layout"))
 # checkboxes are plain standalone controls (no master switch any more -- see
 # mod_settings._template()). The order here MUST match the wire order in _template().
 COL1_KEYS = (u"modes", u"showTechTree", u"showFieldMods", u"showPotentialTierXI",
-             u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete")
+             u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete",
+             u"excludeEliteSystem")
 COL2_KEYS = (u"formatting", u"ignoreFreeXp", u"showPercent", SPACER, u"progressMode",
              SPACER, u"layout", u"scale", SPACER, u"position", u"posX", u"posY")
 
@@ -119,6 +120,7 @@ _LABELS = {
         u"formatting": u"Formatting",
         u"layout": u"Layout",
         u"showWhenComplete": u"Fully Progressed",
+        u"excludeEliteSystem": u"Exclude Elite System",
         u"ignoreFreeXp": u"Ignore Free XP",
         u"showPercent": u"Show Progress %",
         u"progressMode": u"Progress Mode",
@@ -132,6 +134,7 @@ _LABELS = {
         u"formatting": u"Formatierung",
         u"layout": u"Layout",
         u"showWhenComplete": u"Vollständig fortgeschritten",
+        u"excludeEliteSystem": u"Elite-System ausschließen",
         u"ignoreFreeXp": u"Freie Erfahrung ignorieren",
         u"showPercent": u"Fortschritt in % anzeigen",
         u"progressMode": u"Fortschrittsmodus",
@@ -145,6 +148,7 @@ _LABELS = {
         u"formatting": u"Mise en forme",
         u"layout": u"Disposition",
         u"showWhenComplete": u"Entièrement progressé",
+        u"excludeEliteSystem": u"Exclure le système Élite",
         u"ignoreFreeXp": u"Ignorer l'expérience libre",
         u"showPercent": u"Afficher la progression en %",
         u"progressMode": u"Mode de progression",
@@ -158,6 +162,7 @@ _LABELS = {
         u"formatting": u"Formato",
         u"layout": u"Diseño",
         u"showWhenComplete": u"Progreso completo",
+        u"excludeEliteSystem": u"Excluir el sistema Élite",
         u"ignoreFreeXp": u"Ignorar la experiencia libre",
         u"showPercent": u"Mostrar el progreso en %",
         u"progressMode": u"Modo de progreso",
@@ -171,6 +176,7 @@ _LABELS = {
         u"formatting": u"Formattazione",
         u"layout": u"Disposizione",
         u"showWhenComplete": u"Completamente progredito",
+        u"excludeEliteSystem": u"Escludi il sistema Elite",
         u"ignoreFreeXp": u"Ignora l'esperienza libera",
         u"showPercent": u"Mostra l'avanzamento in %",
         u"progressMode": u"Modalità di avanzamento",
@@ -184,6 +190,7 @@ _LABELS = {
         u"formatting": u"Formatowanie",
         u"layout": u"Układ",
         u"showWhenComplete": u"W pełni ukończone",
+        u"excludeEliteSystem": u"Wyklucz system Elite",
         u"ignoreFreeXp": u"Ignoruj wolne doświadczenie",
         u"showPercent": u"Pokaż postęp w %",
         u"progressMode": u"Tryb postępu",
@@ -197,6 +204,7 @@ _LABELS = {
         u"formatting": u"Formátování",
         u"layout": u"Rozvržení",
         u"showWhenComplete": u"Plně dokončeno",
+        u"excludeEliteSystem": u"Vyloučit systém Elite",
         u"ignoreFreeXp": u"Ignorovat volné zkušenosti",
         u"showPercent": u"Zobrazit postup v %",
         u"progressMode": u"Režim postupu",
@@ -210,6 +218,7 @@ _LABELS = {
         u"formatting": u"Форматирование",
         u"layout": u"Расположение",
         u"showWhenComplete": u"Полностью пройдено",
+        u"excludeEliteSystem": u"Исключить систему «Элита»",
         u"ignoreFreeXp": u"Игнорировать свободный опыт",
         u"showPercent": u"Показывать прогресс в %",
         u"progressMode": u"Режим прогресса",
@@ -223,6 +232,7 @@ _LABELS = {
         u"formatting": u"Форматування",
         u"layout": u"Розташування",
         u"showWhenComplete": u"Повністю пройдено",
+        u"excludeEliteSystem": u"Виключити систему «Еліта»",
         u"ignoreFreeXp": u"Ігнорувати вільний досвід",
         u"showPercent": u"Показувати прогрес у %",
         u"progressMode": u"Режим прогресу",
@@ -238,6 +248,7 @@ _LABELS = {
         u"formatting": u"Formázás",
         u"layout": u"Elrendezés",
         u"showWhenComplete": u"Teljesen kész",
+        u"excludeEliteSystem": u"Elit rendszer kizárása",
         u"ignoreFreeXp": u"Szabad tapasztalat mellőzése",
         u"showPercent": u"Haladás megjelenítése %-ban",
         u"progressMode": u"Haladási mód",
@@ -251,6 +262,7 @@ _LABELS = {
         u"formatting": u"Biçimlendirme",
         u"layout": u"Yerleşim",
         u"showWhenComplete": u"Tamamen ilerlemiş",
+        u"excludeEliteSystem": u"Elit Sistemini Hariç Tut",
         u"ignoreFreeXp": u"Serbest deneyimi yok say",
         u"showPercent": u"İlerlemeyi % olarak göster",
         u"progressMode": u"İlerleme modu",
@@ -313,6 +325,11 @@ _TOOLTIPS_EN = {
                           u"Keeps the bar visible on vehicles with nothing left to "
                           u"research, upgrade, or unlock. Uncheck to hide the bar once a "
                           u"vehicle is fully progressed."),
+    u"excludeEliteSystem": (u"Exclude Elite System",
+                            u"When a vehicle's only remaining progression is the Elite "
+                            u"System grade band, shows the Fully Progressed bar instead "
+                            u"of the Elite bar. Elite Rewards are unaffected. Off by "
+                            u"default."),
     u"ignoreFreeXp": (u"Ignore Free XP",
                       u"Counts only the combat XP you earn on each vehicle toward its "
                       u"progress. Free XP is excluded from the bar, the totals, and the "

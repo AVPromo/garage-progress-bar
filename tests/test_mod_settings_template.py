@@ -32,7 +32,7 @@ def _col1():
 
 # --- version ----------------------------------------------------------------
 
-def test_settings_version_is_12():
+def test_settings_version_is_13():
     # Bumped 9 -> 10 when the panel was restructured into three named categories and the
     # showBar master was REMOVED (the restructure alone wouldn't need it -- column identity
     # and masterVarName are absent from Aslain's template signature -- but dropping a
@@ -44,8 +44,10 @@ def test_settings_version_is_12():
     # can reshape a STORED template) on a bump/fresh install -- without it, an existing
     # install's stored column2 keeps its old (shorter) shape forever, and
     # _sync_template_text's positional zip against the new (longer) COL2_KEYS then
-    # mislabels every row past the first new spacer (live regression).
-    assert M._template()["settingsVersion"] == 12
+    # mislabels every row past the first new spacer (live regression). Then 12 -> 13 when
+    # the "excludeEliteSystem" child CheckBox was added under showWhenComplete -- a new
+    # varName, so the bump is mandatory.
+    assert M._template()["settingsVersion"] == 13
 
 
 # --- category headers -------------------------------------------------------
@@ -105,13 +107,14 @@ def test_empty_spacers_precede_progress_mode_and_position():
 # --- modes (column1) --------------------------------------------------------
 
 def test_mode_order_matches_spec():
-    # The header occupies slot 0; the seven mode checkboxes follow. .get (not []) so a
-    # stray Label row -- which carries no varName -- yields a clean order mismatch.
-    assert [c.get("varName") for c in _col1()[1:]] == _MODE_ORDER
+    # The header occupies slot 0; the seven mode checkboxes follow (the excludeElite-
+    # System child comes after, see test_all_seven_modes_are_standalone_checkboxes). .get
+    # (not []) so a stray Label row -- which carries no varName -- yields a clean mismatch.
+    assert [c.get("varName") for c in _col1()[1:8]] == _MODE_ORDER
 
 
 def test_all_seven_modes_are_standalone_checkboxes():
-    modes = _col1()[1:]
+    modes = _col1()[1:8]
     assert len(modes) == 7
     for c in modes:
         assert c["type"] == "CheckBox"
@@ -120,8 +123,17 @@ def test_all_seven_modes_are_standalone_checkboxes():
             "mode %s must not be bound to a master" % c.get("varName"))
 
 
-def test_column1_is_header_plus_seven_modes():
-    assert len(_col1()) == 8
+def test_exclude_elite_system_is_a_child_of_show_when_complete():
+    # The one nested control in column1: gated on showWhenComplete (greyed while Fully
+    # Progressed is off), unlike the seven standalone modes above.
+    child = _col1()[8]
+    assert child["type"] == "CheckBox"
+    assert child["varName"] == "excludeEliteSystem"
+    assert child["masterVarName"] == "showWhenComplete"
+
+
+def test_column1_is_header_plus_seven_modes_plus_one_child():
+    assert len(_col1()) == 9
 
 
 def test_no_show_bar_leftover():
@@ -201,6 +213,10 @@ def test_potential_tier_xi_stays_opt_in():
     assert M.DEFAULTS["showPotentialTierXI"] is False
 
 
+def test_exclude_elite_system_defaults_off():
+    assert M.DEFAULTS["excludeEliteSystem"] is False
+
+
 def test_position_defaults_are_auto():
     assert M.DEFAULTS["posX"] == 0
     assert M.DEFAULTS["posY"] == 0
@@ -233,7 +249,7 @@ def test_mode_values_track_defaults():
 def test_col1_keys_match_template_wire_order():
     from wgmod_research.adapter import settings_i18n as S
     col1 = _col1()
-    assert list(S.COL1_KEYS) == ["modes"] + _MODE_ORDER
+    assert list(S.COL1_KEYS) == ["modes"] + _MODE_ORDER + ["excludeEliteSystem"]
     assert len(col1) == len(S.COL1_KEYS)
     assert col1[0].get("varName") is None            # "modes" header -- no varName
     assert [c.get("varName") for c in col1[1:]] == list(S.COL1_KEYS)[1:]
@@ -388,6 +404,17 @@ def test_show_percent_reads_back_bool():
         assert M.show_percent() is True
     finally:
         M._apply({"showPercent": False})   # restore default for other tests
+
+
+# --- excludeEliteSystem checkbox (column1, child of showWhenComplete) -------
+
+def test_exclude_elite_system_reads_back_bool():
+    assert M.exclude_elite_system() is False
+    M._apply({"excludeEliteSystem": True})
+    try:
+        assert M.exclude_elite_system() is True
+    finally:
+        M._apply({"excludeEliteSystem": False})   # restore default for other tests
 
 
 # --- enabled_modes: the per-mode-toggle -> builder `enabled` set mapping -----

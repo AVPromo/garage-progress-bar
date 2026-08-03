@@ -466,6 +466,36 @@ def test_elite_disabled_hides():
     assert m.mode == t.Mode.HIDDEN
 
 
+# --- "Exclude Elite System" setting (build_model exclude_elite_system) -----
+# Entry-gated on _b_elite (like _b_potential), so OFF falls THROUGH to COMPLETE
+# rather than hiding -- unlike the showElite toggle above, which HIDES.
+
+def test_exclude_elite_system_off_is_unchanged():
+    # Default (False): behaves exactly like test_elite_disabled_hides above.
+    snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, True)])
+    m = build_model(snap, _without(t.Mode.ELITE), exclude_elite_system=False)
+    assert m.mode == t.Mode.HIDDEN
+
+
+def test_exclude_elite_system_falls_through_to_complete():
+    # Rewards all earned -> without the flag this vehicle resolves to the grade band
+    # (ELITE); with it on, ELITE is suppressed and every OTHER applicable category
+    # (just the rewards track here) is already finished, so it reaches COMPLETE
+    # instead -- never HIDDEN.
+    snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, True)])
+    assert build_model(snap).mode == t.Mode.ELITE                    # sanity: normally ELITE
+    m = build_model(snap, exclude_elite_system=True)
+    assert m.mode == t.Mode.COMPLETE
+
+
+def test_exclude_elite_system_does_not_affect_elite_rewards():
+    # An unclaimed reward still wins as ELITE_REWARDS -- only Mode.ELITE is suppressed.
+    snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, False)],
+                       level_xp={12: 800000})
+    m = build_model(snap, exclude_elite_system=True)
+    assert m.mode == t.Mode.ELITE_REWARDS
+
+
 def test_disabling_a_non_matching_higher_mode_is_a_no_op():
     # A fully-researched field-mod tank never resolves to tech-tree, so disabling
     # tech-tree leaves FIELD_MODS showing (only the RESOLVED mode's toggle matters).

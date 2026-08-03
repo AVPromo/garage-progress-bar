@@ -83,13 +83,20 @@ _CATEGORIES = (
 )
 
 
-def resolve(snapshot):
+def resolve(snapshot, exclude_elite_system=False):
     """``[(Mode string, total raw XP)]`` -- one entry per category that applies to this
     vehicle, ONLY when every one of them is finished. ``[]`` when something is still in
     progress, or when no category applies at all (the caller then keeps the old
-    no-data COMPLETE placeholder). Never raises."""
+    no-data COMPLETE placeholder). Never raises.
+
+    `exclude_elite_system` drops Mode.ELITE from the gate entirely (it neither applies
+    nor vetoes), so a vehicle whose only unfinished category is the grade band still
+    reaches COMPLETE. Mode.ELITE_REWARDS is untouched -- an unclaimed reward still
+    vetoes and still wins as a mode."""
     cats = []
     for mode, applies, probe in _CATEGORIES:
+        if exclude_elite_system and mode == t.Mode.ELITE:
+            continue
         try:
             if not applies(snapshot):
                 continue

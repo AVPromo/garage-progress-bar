@@ -122,3 +122,20 @@ def test_an_unreadable_category_totals_zero_instead_of_being_dropped():
     # tier=None makes fieldmods.max_level() raise inside the FIELD_MODS probe while the
     # counter says 3/8 -- unfinished. The category must survive (priced 0) and veto.
     assert complete.resolve(_snap(tier=None, fieldmods_done=3)) == []
+
+
+# --- exclude_elite_system: drops Mode.ELITE from the gate entirely -----------
+
+def test_exclude_elite_system_lets_an_unfinished_elite_level_through():
+    # Without the flag this vetoes (see test_unfinished_elite_level_vetoes); with it on,
+    # ELITE is skipped altogether -- neither applies nor vetoes -- so the other four
+    # finished categories still report.
+    assert complete.resolve(_snap(elite_level=19), exclude_elite_system=True) == [
+        (t.Mode.TECH_TREE, 3000), (t.Mode.SKILL_TREE, 325000),
+        (t.Mode.FIELD_MODS, 3600), (t.Mode.ELITE_REWARDS, 1000)]
+
+
+def test_exclude_elite_system_still_lets_an_unclaimed_reward_veto():
+    # Mode.ELITE_REWARDS is untouched by the flag -- an unclaimed reward still vetoes.
+    assert complete.resolve(_snap(elite_rewards=[t.EliteReward(10, False)]),
+                            exclude_elite_system=True) == []

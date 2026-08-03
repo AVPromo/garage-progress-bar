@@ -21,7 +21,10 @@ column3 would stack UNDER column1 instead of beside it.
                           set of enabled Mode strings build_model consumes -- a vehicle whose
                           resolved mode is off hides the bar (no fall-through) -- and
                           showWhenComplete keeps the bar on fully-progressed (Mode.COMPLETE)
-                          vehicles.
+                          vehicles. Plus one nested child, excludeEliteSystem (masterVarName
+                          showWhenComplete): suppresses Mode.ELITE so a vehicle whose only
+                          remaining progression is the grade band reaches COMPLETE instead
+                          (see domain.builder._b_elite / resolvers.complete).
 - column2 "Formatting" -- ignoreFreeXp / showPercent / progressMode: what the bar COUNTS and
                           how the XP readout READS. None of them gate visibility.
 - column2 "Layout"     -- after the spacer: the scale radio group, then a "Position"
@@ -30,7 +33,9 @@ column3 would stack UNDER column1 instead of beside it.
 There is deliberately NO master switch: the seven mode checkboxes already hide the bar
 everywhere once they're all off, so a separate showBar toggle was redundant the moment the
 master became a category header. The mode checkboxes are therefore plain standalone
-controls -- no masterVarName, nothing greyed.
+controls -- no masterVarName, nothing greyed. excludeEliteSystem is the one exception: it's
+a genuine child of showWhenComplete (greyed while Fully Progressed is off, since it only
+matters when COMPLETE can show at all).
 
 Plus a draggable bar position, stored as two on-screen PIXEL coordinates:
 - posX -- the bar's CENTER-x in px (matches the CSS translateX(-50%) center-anchor).
@@ -75,6 +80,12 @@ DEFAULTS = {# showWhenComplete (default ON) keeps the bar on fully-progressed ve
             # INVERSE of the old hideWhenComplete flag, same net default behavior. See
             # bar_visible in domain/builder.py.
             "showWhenComplete": True,
+            # Child of showWhenComplete (masterVarName-gated) -- opt-in (default off):
+            # suppresses Mode.ELITE entirely, so a vehicle whose only remaining progression
+            # is the Elite System grade band shows Fully Progressed instead. Elite Rewards
+            # are unaffected. Effective only while showWhenComplete is also on (see
+            # gameface_bridge.push).
+            "excludeEliteSystem": False,
             # "Ignore Free XP" -- opt-in (default off): count only the combat XP earned on
             # each vehicle toward its progress, dropping the account-global free XP from the
             # bar, affordability, and tooltips (see domain.builder.build_model ignore_free_xp).
@@ -281,7 +292,9 @@ def _template():
         # Aslain's own structural signature. Values are untouched by this bump (no varName
         # added/removed), so init()'s merge-forward migration below carries every user's
         # settings across losslessly.
-        "settingsVersion": 12,
+        # Bumped 12 -> 13 when the "excludeEliteSystem" child CheckBox was added under
+        # showWhenComplete (a new varName) -- mandatory per the ADDING-a-varName rule above.
+        "settingsVersion": 13,
         "column1": [
             # CATEGORY "Modes" -- the seven per-mode toggles, order per spec: Research,
             # Field Modifications, Tier XI, Upgrades, Elite Rewards, Elite System, Fully
@@ -295,6 +308,18 @@ def _template():
             _mode(t, "showEliteRewards"),
             _mode(t, "showElite"),
             _mode(t, "showWhenComplete"),
+            # Child of showWhenComplete: suppresses Mode.ELITE so a vehicle whose only
+            # remaining progression is the grade band reaches COMPLETE instead. Unlike the
+            # standalone modes above, this one IS nested (masterVarName) -- greyed out while
+            # Fully Progressed is off, matching its "only matters when COMPLETE can show" rule.
+            {
+                "type": "CheckBox",
+                "text": t["excludeEliteSystem"]["text"],
+                "value": DEFAULTS["excludeEliteSystem"],
+                "tooltip": t["excludeEliteSystem"]["tooltip"],
+                "varName": "excludeEliteSystem",
+                "masterVarName": "showWhenComplete",
+            },
         ],
         "column2": [
             # CATEGORY "Formatting" -- what the bar COUNTS and how the readout READS.
@@ -725,6 +750,14 @@ def show_when_complete():
 
 def ignore_free_xp():
     return _settings["ignoreFreeXp"]
+
+
+def exclude_elite_system():
+    """"Exclude Elite System" child setting: True -> suppress Mode.ELITE so a vehicle
+    whose only remaining progression is the grade band reaches COMPLETE instead. Does
+    NOT affect Mode.ELITE_REWARDS. Effective only combined with show_when_complete()
+    (see gameface_bridge.push)."""
+    return _settings["excludeEliteSystem"]
 
 
 def scale():
