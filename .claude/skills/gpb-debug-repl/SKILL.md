@@ -14,7 +14,7 @@ A separate debug package runs a TCP REPL on **127.0.0.1:2223** inside the client
 MoE Calculator's debug REPL uses **2224**, so both mods' debug servers can run simultaneously).
 ```sh
 # Build/deploy the debug package (Py 2.7, client CLOSED)
-& "C:\Python27\python.exe" tools/dev/build_debug_wotmod.py "D:\Games\World_of_Tanks_EU" 2.3.1.0
+& "C:\Python27\python.exe" tools/dev/build_debug_wotmod.py "D:\Games\World_of_Tanks_EU" 2.3.1.1
 # Drive it from the host (Py 3.13, client RUNNING, in Garage)
 & "<py3>" tools/dev/repl_client.py "<expr>"
 & "<py3>" tools/dev/repl_client.py --file cmds.txt
@@ -64,7 +64,7 @@ how you answer "what does X actually cost" without launching the game (companion
 `type = selfDesc >> 28` and `cumEnd = selfDesc & 0x0FFFFFFF`, then `nChildren` x
 `(u16 keyIdx, u32 desc)` pairs (same `type`/cumulative-end packing), then the data block — each
 child's bytes are `[prev cumEnd : cumEnd]`. Key strings come from the file's own dictionary.
-Figures established this way (EU **2.3.1.0**):
+Figures established this way (EU **2.3.1.0**, not re-measured on 2.3.1.1 — re-confirm live if a price looks off):
 - **Field modifications** — `post_progression/prices.xml` `unlockBaseModificationCost`, per tier:
   t6 **3500** / t7 **7000** / t8 **11500** / t9 **20000** / t10 **28000** per level.
 - **Tier-XI skill tree** — **325000** for ALL 22 trees: 26 nodes = 20x10000 + 5x20000 + 1x25000

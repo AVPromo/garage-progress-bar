@@ -72,9 +72,9 @@ Compress-Archive -Path dist\com.14th_ua.garageprogressbar_X.Y.Z.wotmod,dist\INST
 python build\build_wgmods_zip.py       # -> dist\GarageProgressBar-Bundle_X.Y.Z.zip
 ```
 Runs on either Python (only zips already-built files). Needs the `.wotmod` + all three
-`installer\vendor\*.wotmod`; bundles mod + vendor deps under `mods\2.3.1.0\` plus a bilingual
+`installer\vendor\*.wotmod`; bundles mod + vendor deps under `mods\2.3.1.1\` plus a bilingual
 `readme.txt` (generated from `installer\readme.wgmods.txt`, `{VERSION}` auto-stamped). The
-`2.3.1.0` folder is `CLIENT_VERSION` in the generator; bump when the supported client changes.
+`2.3.1.1` folder is `CLIENT_VERSION` in the generator; bump when the supported client changes.
 When the game CLIENT version itself changes (a new WoT patch), do NOT hand-edit these version
 strings — run **wotmod-upgrade-analyzer** then **wotmod-upgrade-implementer** (they own the
 seam-diff, the client-vs-mod-version distinction, and the major-bump-per-patch rule; the last
@@ -93,7 +93,7 @@ Body: intro + `### What's new in X.Y.Z` + Requirements + Install (recommended, .
 install (.wotmod). **Only ever reference Wargaming's World of Tanks.** Never name or contrast
 against any other/regional fork of the game in release notes, readmes, or any doc — these mods
 target Wargaming's World of Tanks only, which every consumer already knows. State compatibility
-positively ("World of Tanks EU 2.3.1.0", "Wargaming EU/global client"). Before publishing,
+positively ("World of Tanks EU 2.3.1.1", "Wargaming EU/global client"). Before publishing,
 proofread every release body + readme to confirm no other client is named.
 
 **Published releases are IMMUTABLE here.** Once a release is published you CANNOT add, delete,

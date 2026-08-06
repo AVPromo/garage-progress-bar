@@ -11,7 +11,7 @@ installs the Garage Progress Bar mod and its dependencies — **OpenWG GameFace*
    locations, then shows the detected folder for the user to confirm or change.
    The chosen folder must contain `version.xml` (the installer validates this).
 2. **Targets the right version** — reads the client version from `version.xml`
-   (e.g. `2.3.1.0`) and installs into `mods\<version>\`.
+   (e.g. `2.3.1.1`) and installs into `mods\<version>\`.
 3. **Installs OpenWG only if missing** — recursively checks `mods\<version>\` for
    `net.openwg.gameface*.wotmod` (so it won't duplicate a copy the user already has
    via ModsList, Aslain, etc.). If absent, it copies the bundled
@@ -77,13 +77,13 @@ if its filename changed).
 
 ```powershell
 # 1. Build the mod package (Python 2.7 — bytecode is version-locked):
-& "C:\Python27\python.exe" build\build_wotmod.py        # -> dist\com.14th_ua.garageprogressbar_1.6.0.wotmod
+& "C:\Python27\python.exe" build\build_wotmod.py        # -> dist\com.14th_ua.garageprogressbar_2.0.0.wotmod
 
 # 2. Install Inno Setup once (provides ISCC.exe):
 winget install -e --id JRSoftware.InnoSetup
 
 # 3. Compile:
-pwsh installer\build_installer.ps1                      # -> dist\GarageProgressBar-Setup-1.6.0.exe
+pwsh installer\build_installer.ps1                      # -> dist\GarageProgressBar-Setup-2.0.0.exe
 ```
 
 `build_installer.ps1` locates `ISCC.exe`, verifies the mod package and bundled

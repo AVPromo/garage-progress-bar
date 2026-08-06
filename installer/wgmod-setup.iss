@@ -3,7 +3,7 @@
 ; What it does, one double-click:
 ;   1. Detects the World of Tanks install folder (registry + common paths), lets
 ;      the user confirm/override it, and validates it (version.xml present).
-;   2. Resolves the client version (e.g. 2.3.1.0) and targets mods\<version>\.
+;   2. Resolves the client version (e.g. 2.3.1.1) and targets mods\<version>\.
 ;   3. Installs the bundled OpenWG GameFace dependency ONLY if it isn't already
 ;      present (recursive check) -- many users already have it via ModsList/Aslain.
 ;   4. Cleans old copies of this mod (and stale loose res_mods leftovers), then
@@ -13,8 +13,8 @@
 ;         .wotmod already built into ..\dist by build\build_wotmod.py).
 
 #define ModId         "com.14th_ua.garageprogressbar"
-#define ModVersion    "1.6.0"
-#define ModWotmod     "com.14th_ua.garageprogressbar_1.6.0.wotmod"
+#define ModVersion    "2.0.0"
+#define ModWotmod     "com.14th_ua.garageprogressbar_2.0.0.wotmod"
 #define OpenWgWotmod  "net.openwg.gameface_1.1.6.wotmod"
 #define MsaWotmod     "aslain.modssettingsapi_1.6.4.wotmod"
 #define ModsListWotmod "me.poliroid.modslistapi_1.7.8.wotmod"
@@ -66,7 +66,7 @@ SelectDirBrowseLabel=Confirm your World of Tanks installation folder (the one co
 
 [Code]
 var
-  GVersion: string;         { resolved game version, e.g. 2.3.1.0 }
+  GVersion: string;         { resolved game version, e.g. 2.3.1.1 }
   GUpdateChecked: Boolean;   { the GitHub update check has run once this session }
   GRelaunching: Boolean;     { a newer installer was launched; suppress cancel prompt }
   DownloadPage: TDownloadWizardPage;
@@ -81,7 +81,7 @@ begin
              FileExists(Path + '\WorldOfTanks.exe'));
 end;
 
-{ Parse "<version> v.2.3.1.0 #903 </version>" -> "2.3.1.0" }
+{ Parse "<version> v.2.3.1.1 #910 </version>" -> "2.3.1.1" }
 function ReadGameVersion(Root: string): string;
 var
   S: AnsiString;
