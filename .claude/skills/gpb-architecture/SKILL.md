@@ -384,6 +384,13 @@ tank now shows Fully Progressed instead of the Elite bar.)
     Ships `cs de en es fr hu it pl ru tr uk`; verify exact client codes live (gpb-debug-repl).
   - The propagate-to-existing-installs step is `_sync_template_text(api)`, called unconditionally
     per candidate api in `init()` (walks the STORED template and rewrites its label text in place).
+    **It also rewrites `scale`/`progressMode`'s stored `options[i]["label"]`, positionally,
+    guarded by a length match** — the second axis of the caching gotcha (options are cached
+    separately from `text`/`tooltip`, so a text/tooltip-only rewrite loop leaves them frozen in
+    whatever language the panel first registered with; a fresh install hides the bug because its
+    template was already written in the current language). Still text-only, no `settingsVersion`
+    bump. Full mechanism in **wotmod-i18n-settings** → "THE gotcha"; regression test
+    `test_sync_template_text_relabels_stale_radio_options` (`tests/test_position.py`).
   - **The `<b>` bold-header wrap MUST live inside `render_panel()`, not `_template()`** — the
     single function both the initial build and `_sync_template_text` source their text from.
     `HEADER_KEYS` (frozenset of the three category `Label` keys) gates the wrap in

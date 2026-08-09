@@ -366,3 +366,25 @@ def test_sync_template_text_guards_missing_template():
     api.state = {"templates": {}}
     mod_settings._sync_template_text(api)
     assert api.saved == 0
+
+
+def test_sync_template_text_relabels_stale_radio_options(monkeypatch):
+    # THE bug this locks: MSA stores a COPY of the option labels too (not just text/
+    # tooltip), so a stored template whose scale options were rendered in English never
+    # picks up a later client-language change without this rewrite.
+    import sys
+    import types
+    stale = mod_settings._template()          # built while client_language() == "en"
+    scale = stale["column2"][7]
+    assert scale["varName"] == "scale"
+    assert [o["label"] for o in scale["options"]] == [u"Default", u"Large"]
+
+    fake = types.ModuleType(u"helpers")
+    fake.getClientLanguage = lambda: u"de"
+    monkeypatch.setitem(sys.modules, u"helpers", fake)
+
+    api = _FakeStateApi(stale)
+    mod_settings._sync_template_text(api)     # now runs with "de" active
+
+    assert [o["label"] for o in scale["options"]] == [u"Standard", u"Groß"]
+    assert api.saved == 1

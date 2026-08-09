@@ -426,7 +426,10 @@ def _sync_template_text(api):
     never re-applies the template text, so a language change (or this feature landing over
     an English install) would otherwise never show. This walks the stored template in
     lockstep with settings_i18n's column key order (Labels carry no varName) and overwrites
-    each entry's text/tooltip from panel_text(), saving only if something changed.
+    each entry's text/tooltip from panel_text(), saving only if something changed. The two
+    RadioButtonGroups (scale, progressMode) also carry an "options" list of {"label": ...}
+    dicts that panel_text() never touches directly -- rewritten here positionally too,
+    skipped silently on a length mismatch or a non-dict entry.
     Idempotent: a no-op on a fresh install (text already matches). Guarded; all changes are
     text-only so no settingsVersion bump is involved for a length-MATCHED column.
 
@@ -459,6 +462,13 @@ def _sync_template_text(api):
                 if tip is not None and comp.get("tooltip") != tip:
                     comp["tooltip"] = tip
                     changed = True
+                opts = rendered.get("options")
+                stored_opts = comp.get("options")
+                if opts and isinstance(stored_opts, list) and len(stored_opts) == len(opts):
+                    for opt, lbl in zip(stored_opts, opts):
+                        if isinstance(opt, dict) and opt.get("label") != lbl:
+                            opt["label"] = lbl
+                            changed = True
         if changed and hasattr(api, "saveState"):
             api.saveState()
             LOG_NOTE("[wgmod] synced settings template text to client language")
