@@ -29,6 +29,11 @@ const GRADE = {                                         // domain/constants.py G
     IRON: "iron", BRONZE: "bronze", SILVER: "silver", GOLD: "gold",
     ENAMEL: "enamel", PRESTIGE: "prestige", UNDEFINED: "undefined",
 };
+// A buff-line record's cls field (see adapter/format.py kpi_record): "pos"/"neg"
+// colour green/red; NEUTRAL (the generic 'value' KPI a mechanic perk carries, no
+// reliable direction signal) gets no colour class at all -- matches
+// format.KPI_CLASS_NEUTRAL verbatim.
+const KPI_CLASS_NEUTRAL = "neu";
 // Dev-only flag (flip by hand for a dev build, like _compat._DEBUG on the Python side):
 // forces the Fully Progressed (COMPLETE) render path on EVERY vehicle so it can be
 // inspected in-client without owning a fully-progressed tank. The fake 0..1 scale below
@@ -682,8 +687,9 @@ function buffLineHtml(line, baseCls) {
             icon + '\')"></span>';
     }
     if (value) {
-        h += '<span class="wg-tip-buff-val ' +
-            (cls === "neg" ? "wg-buff-neg" : "wg-buff-pos") + '">' +
+        const colorCls = cls === KPI_CLASS_NEUTRAL ? "" :
+            (cls === "neg" ? " wg-buff-neg" : " wg-buff-pos");
+        h += '<span class="wg-tip-buff-val' + colorCls + '">' +
             escapeHtml(value) + "</span>";
     }
     if (desc) {

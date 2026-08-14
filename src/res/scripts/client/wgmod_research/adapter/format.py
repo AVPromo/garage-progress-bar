@@ -281,6 +281,24 @@ KPI_PARAM_ICON = {
 }
 
 
+# Raw KPI names that are "lower is better" ONLY via the game's compound,
+# per-component _CUSTOM_QUALITY_PARAMS table (each entry there is a per-component
+# tuple, e.g. pitchLimits=(True, False) with component 0 = depression backward,
+# component 1 = elevation not) -- never through the flat BACKWARD_QUALITY_PARAMS
+# set _resolve_is_debuff otherwise consults, so a beneficial reduction is left
+# flagged as a debuff (red) unless overridden here. Verified live (EU 2.3):
+# gunDepression value=-1.0 -> game isDebuff=True (wrong, should be a buff);
+# reloadTimeInClip has the same shape via 'clipFireRate'. Do NOT add
+# 'gunElevation' -- it maps to the same 'pitchLimits' param but the OTHER
+# (non-backward) component, so forcing it here would invert an already-correct
+# read.
+# ponytail: a 2-entry explicit override, not a generic _CUSTOM_QUALITY_PARAMS
+# tuple-index resolver -- add a name here if a new compound-backward scalar KPI
+# turns up; only build the generic per-component resolver if this list grows
+# unwieldy.
+KPI_BACKWARD_OVERRIDE = frozenset(["gunDepression", "reloadTimeInClip"])
+
+
 def param_icon_name(kpi_name):
     """The vehParams param/icon basename for a KPI name (via KPI_PARAM_ICON, else
     the name verbatim). "" for a falsy name."""
@@ -318,13 +336,26 @@ def resolve_is_debuff(raw_is_debuff, kpi_name_backward, param_name_backward):
     return raw_is_debuff
 
 
+# cls sentinel for a KPI with no reliable buff/nerf direction (the generic
+# KPI.Name.VALUE placeholder a signature mechanic-perk KPI carries -- see
+# kpi_record). Mirrored in WGModResearch.js's buffLineHtml -- keep the two
+# literals in lockstep.
+KPI_CLASS_NEUTRAL = "neu"
+
+
 def kpi_record(icon, is_debuff, value_str, desc):
     """Pack one buff line into the widget's delimited record
     (icon <SEP> cls <SEP> value <SEP> desc), where cls is 'neg' for a debuff
-    (nerf -> red) else 'pos' (buff -> green). All fields coerced to "" when
-    absent. This is the single source of the wire format; WGModResearch.js splits
-    on the same separator."""
-    cls = "neg" if is_debuff else "pos"
+    (nerf -> red), 'pos' for a buff (green), or KPI_CLASS_NEUTRAL when
+    is_debuff is None -- no colour at all, for a KPI with no reliable direction
+    signal (the generic 'value' KPI a mechanic perk carries; WG's own perk
+    tooltip renders those neutral too). All fields coerced to "" when absent.
+    This is the single source of the wire format; WGModResearch.js splits on the
+    same separator."""
+    if is_debuff is None:
+        cls = KPI_CLASS_NEUTRAL
+    else:
+        cls = "neg" if is_debuff else "pos"
     return KPI_FIELD_SEP.join(
         [icon or "", cls, value_str or "", desc or ""])
 

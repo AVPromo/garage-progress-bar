@@ -320,6 +320,15 @@ def test_kpi_record_coerces_missing_fields_to_empty():
     assert f.kpi_record(None, True, None, None) == sep.join(["", "neg", "", ""])
 
 
+def test_kpi_record_is_debuff_none_is_neutral():
+    # the generic 'value' KPI (mechanic perk, no reliable direction) -> no
+    # buff/nerf colour at all; the wire cls is KPI_CLASS_NEUTRAL, mirrored in JS.
+    sep = f.KPI_FIELD_SEP
+    rec = f.kpi_record("", None, "+20", "")
+    assert rec == sep.join(["", f.KPI_CLASS_NEUTRAL, "+20", ""])
+    assert f.KPI_CLASS_NEUTRAL not in ("pos", "neg")
+
+
 def test_degenerate_kpi_records_are_dropped_from_appended_lines():
     # the naked-number bug: a 'mechanic' node's generic 'value' KPI resolves to no
     # vehParams icon AND no phrase, so its record is a bare green figure. The append
@@ -370,3 +379,13 @@ def test_resolve_is_debuff_keeps_raw_when_only_kpi_backward():
                                param_name_backward=False) is True
     assert f.resolve_is_debuff(False, kpi_name_backward=True,
                                param_name_backward=False) is False
+
+
+def test_kpi_backward_override_named_entries_only():
+    # gunDepression/reloadTimeInClip are backward ONLY via the game's compound
+    # _CUSTOM_QUALITY_PARAMS table (not the flat set _resolve_is_debuff otherwise
+    # consults) -- see format.KPI_BACKWARD_OVERRIDE's docstring.
+    assert f.KPI_BACKWARD_OVERRIDE == frozenset(["gunDepression", "reloadTimeInClip"])
+    # gunElevation maps to the same 'pitchLimits' param but the OTHER (already
+    # correctly-read) component -- must NOT be overridden.
+    assert "gunElevation" not in f.KPI_BACKWARD_OVERRIDE
