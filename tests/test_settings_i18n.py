@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for the settings-panel LABEL resolver (engine-free).
+"""Unit tests for the settings-panel text resolver (engine-free).
 
-Scope under test: only the panel LABELS are localized (WG feature names + mod-invented
-label tables); tooltips are fixed English. settings_i18n imports cleanly under pytest
-because _compat guards debug_utils and i18n.widget_labels() fails soft to English."""
+Scope under test: the panel LABELS (WG feature names + mod-invented label tables), the
+radio OPTION labels, and the TOOLTIPS -- all three localized into the same 11 codes with
+English as the per-key fallback. settings_i18n imports cleanly under pytest because
+_compat guards debug_utils and i18n.widget_labels() fails soft to English."""
 import sys
 import types
 
@@ -32,8 +33,8 @@ _FAKE_WL = {
 def test_keys_partition_all_controls():
     assert _MOD_KEYS | _FEATURE_KEYS == _ALL_KEYS
     assert _MOD_KEYS & _FEATURE_KEYS == set()
-    # Every control has a fixed English tooltip EXCEPT the three inert category headers.
-    assert set(S._TOOLTIPS_EN.keys()) == _ALL_KEYS - _HEADER_KEYS
+    # Every control has a tooltip EXCEPT the three inert category headers.
+    assert set(S._TOOLTIPS[u"en"].keys()) == _ALL_KEYS - _HEADER_KEYS
 
 
 def test_category_headers_render_without_a_tooltip():
@@ -168,24 +169,69 @@ def test_show_percent_and_progress_mode_have_labels_and_tooltips():
             assert r[key][u"tooltip"].startswith(u"{HEADER}")
 
 
-# --- tooltips are FIXED ENGLISH, never translated ---------------------------
+# --- tooltips are LOCALIZED (same 11 codes as the labels) -------------------
 
-def test_tooltips_are_english_in_every_language():
+def test_every_shipped_language_covers_all_tooltips():
+    # THE dropped-key guard: each of the 11 blocks must carry all 15 tooltip keys, each
+    # with a non-empty header AND body. A missing key would silently render English.
+    en_keys = set(S._TOOLTIPS[u"en"].keys())
+    assert set(S._TOOLTIPS.keys()) == set(S._LABELS.keys())      # same shipped languages
+    for code, block in S._TOOLTIPS.items():
+        assert set(block.keys()) == en_keys, (
+            u"lang %s tooltip keys differ: missing %s / extra %s"
+            % (code, en_keys - set(block), set(block) - en_keys))
+        for key, entry in block.items():
+            assert len(entry) == 2, u"%s/%s must be a (header, body) pair" % (code, key)
+            header, body = entry
+            assert header and header.strip(), u"%s/%s has an empty header" % (code, key)
+            assert body and body.strip(), u"%s/%s has an empty body" % (code, key)
+
+
+def test_tooltips_are_localized_not_english():
     en = S.render_panel(_FAKE_WL, lang=u"en")
     for code in _SHIPPED:
         r = S.render_panel(_FAKE_WL, lang=code)
         for key in _ALL_KEYS - _HEADER_KEYS:
-            assert r[key][u"tooltip"] == en[key][u"tooltip"], (
-                u"tooltip for %s differs in %s -- must stay English" % (key, code))
+            assert r[key][u"tooltip"] != en[key][u"tooltip"], (
+                u"tooltip for %s is still the English string in %s" % (key, code))
+
+
+def test_tooltip_bodies_keep_the_english_tokens():
+    # Placeholders / markup-ish tokens must ride across untranslated: the scale body's
+    # em-dash substitute " - " (the client renders a real em-dash as "--"), the "/" in the
+    # progressMode option name, the "%" in showPercent's header, and the "+" in the
+    # Tier XI banked-XP sum.
+    for code in S._TOOLTIPS:
+        tips = S._TOOLTIPS[code]
+        assert u" - " in tips[u"scale"][1], code
+        assert u" / " in tips[u"progressMode"][1], code
+        assert u"%" in tips[u"showPercent"][0], code
+        assert u" + " in tips[u"showPotentialTierXI"][1], code
 
 
 def test_tooltip_markup_shape():
-    r = S.render_panel(_FAKE_WL, lang=u"de")
+    # Assembled ONCE in render_panel, so no translation string carries the markup.
+    for code in S._TOOLTIPS:
+        assert not any(u"{HEADER}" in s for e in S._TOOLTIPS[code].values() for s in e)
+    r = S.render_panel(_FAKE_WL, lang=u"en")
     tip = r[u"showWhenComplete"][u"tooltip"]
     assert tip == (u"{HEADER}Fully Progressed{/HEADER}"
                    u"{BODY}Keeps the bar visible on vehicles with nothing left to "
                    u"research, upgrade, or unlock. Uncheck to hide the bar once a "
                    u"vehicle is fully progressed.{/BODY}")
+    de = S.render_panel(_FAKE_WL, lang=u"de")[u"posX"][u"tooltip"]
+    assert de == (u"{HEADER}Horizontale Position{/HEADER}"
+                  u"{BODY}Die MITTE der Leiste, in Pixeln vom linken "
+                  u"Bildschirmrand.{/BODY}")
+
+
+def test_partial_language_falls_back_per_tooltip_key(monkeypatch):
+    # A language that translated one tooltip keeps English for the other fourteen.
+    monkeypatch.setitem(S._TOOLTIPS, u"zz", {u"posX": (u"ZZ-H", u"ZZ-B")})
+    monkeypatch.setitem(S._LABELS, u"zz", dict(S._LABELS[u"en"]))
+    r = S.render_panel(_FAKE_WL, lang=u"zz")
+    assert r[u"posX"][u"tooltip"] == u"{HEADER}ZZ-H{/HEADER}{BODY}ZZ-B{/BODY}"
+    assert r[u"posY"][u"tooltip"] == S.render_panel(_FAKE_WL, lang=u"en")[u"posY"][u"tooltip"]
 
 
 # --- _norm ------------------------------------------------------------------

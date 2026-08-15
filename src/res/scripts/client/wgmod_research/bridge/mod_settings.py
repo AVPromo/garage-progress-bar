@@ -185,7 +185,7 @@ def _mode(t, var):
 def _label(t, key):
     """A category header / sub-header row: an inert `Label`, the same component the old
     "Bar position" caption already used. The three category headers carry no tooltip at all
-    (settings_i18n has no _TOOLTIPS_EN entry for them), so the key is only emitted when the
+    (settings_i18n has no _TOOLTIPS entry for them), so the key is only emitted when the
     rendered text actually has one -- the "position" sub-header does.
 
     Category headers arrive from settings_i18n ALREADY wrapped in `<b>...</b>` -- the wrap
