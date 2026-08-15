@@ -210,6 +210,23 @@ tank now shows Fully Progressed instead of the Elite bar.)
     membership booleans against the game set (fail-soft — falls back to raw `KPI.isDebuff` if the
     import fails) and defers to the pure helper, which then feeds `format.kpi_record`
     (`neg`=red / `pos`=green).
+  - **The game keeps TWO separate "lower is better" tables, not one — check both before
+    concluding no signal exists.** `gui.shared.items_parameters.comparator` exports the flat
+    `BACKWARD_QUALITY_PARAMS` set above AND a second, compound `_CUSTOM_QUALITY_PARAMS` table
+    (per-component tuples; currently `pitchLimits`, `clipFireRate`, `burstFireRate`,
+    `turboshaftBurstFireRate`). `KPI.isDebuff` (`gui/shared/gui_items/__init__.py:463-465`)
+    consults ONLY the flat set, so a KPI that is "lower is better" solely via the compound table
+    computes the WRONG `isDebuff` at the source — e.g. `gunDepression` (backward via
+    `pitchLimits` component 0) and `reloadTimeInClip` (via `clipFireRate`). Fix:
+    `format.KPI_BACKWARD_OVERRIDE = frozenset(["gunDepression", "reloadTimeInClip"])`, ORed into
+    `_resolve_is_debuff`'s param-backward branch. **Key it by the RAW KPI name, not the mapped
+    param name** — `pitchLimits` is compound (component 0 depression = backward, component 1
+    elevation = not), so `gunDepression` belongs in the override but `gunElevation` (same param,
+    other component) must NOT — adding it would invert an already-correct read.
+  - **Signature "mechanic" perks (`KPI.Name.VALUE`, raw name `'value'`) have NO reliable
+    direction signal anywhere** — not in either quality table, not in WG's own skill-tree
+    tooltip (which renders these neutral too). Convention: a `name == 'value'` line renders
+    NEUTRAL (`cls="neu"`, `is_debuff=None`) — match WG, don't invent a direction for it.
   - **Tier-XI description templates INDEX their value slots: `{<kpi.name><0-based index>}`, with
     the index OMITTED when the node has exactly ONE KPI.** So a single-KPI node reads `{value}`
     while a multi-KPI node reads `{value0}`/`{value1}` — a plain `{value}`-only substitution leaves

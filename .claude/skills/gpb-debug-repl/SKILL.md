@@ -23,6 +23,12 @@ MoE Calculator's debug REPL uses **2224**, so both mods' debug servers can run s
   in a single `--file`. For multi-line code, write a `.py` and send `execfile(r'<abs path>')`.
 - Keep the debug package SLIM (only `mod_wgmod_debug.pyc`). If it also ships `wgmod_research`
   it conflicts with the real mod and the client ignores BOTH.
+- **The debug package and the real mod are DISJOINT — rebuilding one never updates the
+  other.** `build_debug_wotmod.py` packages ONLY the REPL entry module
+  (`mod_wgmod_debug.pyc`); it never touches `wgmod_research`. A source fix only reaches the
+  client via `build/deploy_wotmod.py <install> <ver>` (the real
+  `com.14th_ua.garageprogressbar_<ver>.wotmod`) + relaunch — see **gpb-build-deploy**. Mixing
+  these up mid-session silently re-tests stale code.
 
 ### Handy snippets
 ```python
