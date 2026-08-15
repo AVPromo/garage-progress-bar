@@ -1063,10 +1063,12 @@ function arrGet(a, i) {
     return unwrap(a[i] !== undefined ? a[i] : a.get && a.get(i));
 }
 
-// Tier-XI "Next available:" row below the bar: a caption + one clickable chip per
-// available frontier node (perk icon, hover tooltip with name + XP cost, click to
-// unlock). Hidden when nothing is available. The signature FINAL upgrade stays on
-// the bar itself (its rightmost end tick), separate from this row.
+// Tier-XI "Next available:" row below the bar: a caption-less strip of one clickable
+// chip per available frontier node (perk icon, hover tooltip with name + XP cost,
+// click to unlock), PLUS one locked chip per still-locked "next" node one hop past
+// them, connected back to its available parent(s) by a short filled connector bar
+// (.wg-chip-link -- see the CSS). Hidden when nothing is available. The signature
+// FINAL upgrade stays on the bar itself (its rightmost end tick), separate from this row.
 //
 // The chips are VISUAL ONLY (pointer-events:none -- in this Coherent build, elements
 // nested under the pointer-events:none root don't reliably receive events even with
@@ -1074,63 +1076,204 @@ function arrGet(a, i) {
 // proven-interactive layer, which spans this row's area): we register each chip's
 // element + command + tooltip in hotEl._wgChips, and ensureHover() hit-tests them by
 // bounding rect for hover (toggling the chip's own .wg-chip-tip) and click.
-function renderNextAvailable(nextEl, arr, hotEl, spendableXp, est) {
+function renderNextAvailable(nextEl, arr, nextArr, hotEl, spendableXp, est) {
     nextEl.innerHTML = "";
     const chips = [];
     const n = arrLen(arr);
-    if (n) {
-        // (No "Next available:" caption -- the chips speak for themselves and the label
-        // had no localized game equivalent.)
-        for (let i = 0; i < n; i++) {
-            const u = arrGet(arr, i);
-            if (!u) continue;
-            const xp = u.xpRequired | 0;
-            // Match the Upgrades screen: minor (10k) -> circle; major
-            // (>=20k: 20k/25k) -> diamond. Frame + perk glyph layered.
-            const chip = document.createElement("div");
-            chip.className = "wg-chip " + (xp >= 20000 ? "wg-chip-major" : "wg-chip-minor");
-            if (u.done) chip.className += " wg-done";   // session marker: green check + open-screen click
-            fillChipGlyph(chip, u.icon);
-            const tip = document.createElement("div");
-            tip.className = "wg-chip-tip";
-            // Type caption = the node's own Upgrades-screen sub-heading ("Mechanic
-            // Upgrade" / "Special Upgrade", localized from Python); falls back to the
-            // generic word. Then name + buffs; the node's perk art (img:// URL) as the
-            // right-side icon, matching the chip glyph. Icon-less nodes -> text-only.
-            const cName = u.name
-                ? '<div class="wg-tip-name">' + escapeHtml(u.name) + "</div>" : "";
-            // Node sub-heading if the game gave one, else the localized "Upgrades"
-            // section label (never the bare English word).
-            const cCap = u.category || L("headerSkillTree", "Upgrades");
-            const cTitle = capHtml(escapeHtml(cCap)) + cName;
-            const cBody = effectHtml(u.effect);
-            const cIcon = (u.icon && u.icon.indexOf("img://") === 0) ? bgIconHtml(u.icon) : "";
-            // Done marker -> already unlocked, no cost/footer; else per-node cost
-            // (frontier nodes unlock independently). No fillVehicle arg: `xp` here is
-            // a node COUNT-cost, not a two-currency XP figure, so a "-<n>" vehicle
-            // remaining sub-line would be bogus.
-            const cFoot = u.done
-                ? ""
-                : xpFracHtml(spendableXp, xp, xpCurrencyIcon(), undefined, est);
-            // Text block + icon as one unit (no divider between them); divider before cost.
-            tip.innerHTML = joinSections([tipMain(cIcon, cTitle, cBody), cFoot]);
-            chip.appendChild(tip);
-            if (u.done) chip.appendChild(doneBadge());   // green check, bottom-right
-            nextEl.appendChild(chip);
-            // Gate clickability on affordability, like the bar's ticks: an
-            // unaffordable frontier node isn't unlockable, so give it a null cmd
-            // (the click handler no-ops on null). Done markers open the screen.
-            chips.push(u.done
-                ? { el: chip, tip: tip, cmd: CMD.OPEN_SKILL_TREE, arg: undefined }
-                : { el: chip, tip: tip,
-                    cmd: (spendableXp >= xp) ? CMD.UNLOCK_FIELD_MOD : null,
-                    arg: u.actionId });
-        }
-        nextEl.style.display = "flex";
-    } else {
+    if (!n) {
         nextEl.style.display = "none";
+        if (hotEl) hotEl._wgChips = chips;
+        return;
     }
+    // (No "Next available:" caption -- the chips speak for themselves and the label
+    // had no localized game equivalent.)
+    const availItems = [];   // {el, tip, cmd, arg, stepId} -- stepId links a "next" chip back
+    for (let i = 0; i < n; i++) {
+        const u = arrGet(arr, i);
+        if (!u) continue;
+        const xp = u.xpRequired | 0;
+        // Match the Upgrades screen: minor (10k) -> circle; major
+        // (>=20k: 20k/25k) -> diamond. Frame + perk glyph layered.
+        const chip = document.createElement("div");
+        chip.className = "wg-chip " + (xp >= 20000 ? "wg-chip-major" : "wg-chip-minor");
+        if (u.done) chip.className += " wg-done";   // session marker: green check + open-screen click
+        fillChipGlyph(chip, u.icon);
+        const tip = document.createElement("div");
+        tip.className = "wg-chip-tip";
+        // Type caption = the node's own Upgrades-screen sub-heading ("Mechanic
+        // Upgrade" / "Special Upgrade", localized from Python); falls back to the
+        // generic word. Then name + buffs; the node's perk art (img:// URL) as the
+        // right-side icon, matching the chip glyph. Icon-less nodes -> text-only.
+        const cName = u.name
+            ? '<div class="wg-tip-name">' + escapeHtml(u.name) + "</div>" : "";
+        // Node sub-heading if the game gave one, else the localized "Upgrades"
+        // section label (never the bare English word).
+        const cCap = u.category || L("headerSkillTree", "Upgrades");
+        const cTitle = capHtml(escapeHtml(cCap)) + cName;
+        const cBody = effectHtml(u.effect);
+        const cIcon = (u.icon && u.icon.indexOf("img://") === 0) ? bgIconHtml(u.icon) : "";
+        // Done marker -> already unlocked, no cost/footer; else per-node cost
+        // (frontier nodes unlock independently). No fillVehicle arg: `xp` here is
+        // a node COUNT-cost, not a two-currency XP figure, so a "-<n>" vehicle
+        // remaining sub-line would be bogus.
+        const cFoot = u.done
+            ? ""
+            : xpFracHtml(spendableXp, xp, xpCurrencyIcon(), undefined, est);
+        // Text block + icon as one unit (no divider between them); divider before cost.
+        tip.innerHTML = joinSections([tipMain(cIcon, cTitle, cBody), cFoot]);
+        chip.appendChild(tip);
+        if (u.done) chip.appendChild(doneBadge());   // green check, bottom-right
+        // Gate clickability on affordability, like the bar's ticks: an
+        // unaffordable frontier node isn't unlockable, so give it a null cmd
+        // (the click handler no-ops on null). Done markers open the screen.
+        availItems.push(u.done
+            ? { el: chip, tip: tip, cmd: CMD.OPEN_SKILL_TREE, arg: undefined, stepId: u.stepId | 0 }
+            : { el: chip, tip: tip,
+                cmd: (spendableXp >= xp) ? CMD.UNLOCK_FIELD_MOD : null,
+                arg: u.actionId, stepId: u.stepId | 0 });
+    }
+
+    // -- locked "next" chips: match each to its available parent(s) by stepId --------
+    const stepIndex = {};   // stepId -> index into availItems
+    for (let i = 0; i < availItems.length; i++) {
+        if (availItems[i].stepId) stepIndex[availItems[i].stepId] = i;
+    }
+    // insertAfter[availIdx] -> queue of {kind:"single"|"between", nu, rightIdx?}, in
+    // data order; appendEnd -> nodes matching no available chip at all (no connector).
+    const insertAfter = {};
+    const usedBetween = {};   // an availIdx already consumed as one side of a 2-parent bridge
+    const appendEnd = [];
+    const nn = arrLen(nextArr);
+    for (let j = 0; j < nn; j++) {
+        const nu = arrGet(nextArr, j);
+        if (!nu) continue;
+        const ids = String(nu.parentIds || "").split(",")
+            .map(function (s) { return parseInt(s, 10); })
+            .filter(function (id) { return !isNaN(id) && id > 0; });
+        const matched = [];
+        for (let k = 0; k < ids.length; k++) {
+            const idx = stepIndex[ids[k]];
+            if (idx !== undefined && matched.indexOf(idx) === -1) matched.push(idx);
+        }
+        if (!matched.length) { appendEnd.push(nu); continue; }
+        if (matched.length >= 2) {
+            const a = Math.min(matched[0], matched[1]), b = Math.max(matched[0], matched[1]);
+            // Clean convergent shape: the two parents are adjacent in the row and
+            // neither is already bridging another next chip -> place this one BETWEEN
+            // them, a connector on each side ("<>-[]-<>").
+            if (b === a + 1 && !usedBetween[a] && !usedBetween[b]) {
+                usedBetween[a] = usedBetween[b] = true;
+                (insertAfter[a] = insertAfter[a] || []).push({ kind: "between", nu: nu, rightIdx: b });
+                continue;
+            }
+            // ponytail: a graph too tangled for a clean linear placement (convergent
+            // beyond 2 parents, non-adjacent parents, or a parent already bridging
+            // another next) falls back to a single connector off the FIRST matched
+            // parent rather than a real layout engine -- upgrade to an SVG overlay if
+            // real skill trees ever need more than this.
+        }
+        (insertAfter[matched[0]] = insertAfter[matched[0]] || []).push({ kind: "single", nu: nu });
+    }
+
+    // -- emit the row in order: each avail chip, then anything queued after it -------
+    const appended = {};
+    function appendAvail(idx) {
+        if (appended[idx]) return;
+        appended[idx] = true;
+        nextEl.appendChild(availItems[idx].el);
+        chips.push(availItems[idx]);
+    }
+    function appendLink() {
+        const link = document.createElement("div");
+        link.className = "wg-chip-link";
+        nextEl.appendChild(link);
+    }
+    function appendNext(nu) {
+        const built = buildNextChip(nu, spendableXp, est);
+        nextEl.appendChild(built.el);
+        chips.push({ el: built.el, tip: built.tip, cmd: null, arg: undefined });
+    }
+    // Fan-out: ONE available parent with TWO locked "next" chips matched to it ALONE
+    // (queue is exactly [single, single] -- no convergent/tangled entries). The FIRST
+    // stays inline to the right (existing horizontal shape, unchanged); the SECOND
+    // renders in a column BELOW the parent, joined by a vertical connector
+    // (.wg-chip-link-down), so the parent's own row position/spacing never shifts.
+    function appendAvailColumn(idx, belowNu) {
+        if (appended[idx]) return;
+        appended[idx] = true;
+        const col = document.createElement("div");
+        col.className = "wg-chip-col";
+        col.appendChild(availItems[idx].el);
+        const down = document.createElement("div");
+        down.className = "wg-chip-link-down";
+        col.appendChild(down);
+        const built = buildNextChip(belowNu, spendableXp, est);
+        col.appendChild(built.el);
+        nextEl.appendChild(col);
+        chips.push(availItems[idx]);
+        const belowChip = { el: built.el, tip: built.tip, cmd: null, arg: undefined };
+        chips.push(belowChip);
+        // The column drops this chip below .wg-hot's flat coverage (that overlay assumes
+        // a single horizontal row -- see its own CSS comment -- so it never extends this
+        // far down), meaning hotEl's mousemove/chipAt never fires while the cursor is over
+        // it. Re-enable pointer-events on JUST this chip's own box (.wg-chip-col-hot, CSS)
+        // -- it already sits at its real on-screen rect via the column's normal flex flow,
+        // no separate geometry needed -- and drive the SAME setActiveChip() the flat row
+        // uses, so hover here is indistinguishable from hover on any other chip. No cmd,
+        // so no click wiring and no pointer cursor (default cursor, set in CSS).
+        built.el.classList.add("wg-chip-col-hot");
+        built.el.addEventListener("mouseenter", function () { setActiveChip(hotEl, belowChip); });
+        built.el.addEventListener("mouseleave", function () {
+            if (hotEl._wgActiveChip === belowChip) setActiveChip(hotEl, null);
+        });
+    }
+    for (let i = 0; i < availItems.length; i++) {
+        const queue = insertAfter[i] || [];
+        const fanOut = !appended[i] && queue.length === 2 &&
+            queue[0].kind === "single" && queue[1].kind === "single";
+        if (fanOut) {
+            appendAvailColumn(i, queue[1].nu);
+            appendLink();
+            appendNext(queue[0].nu);
+            continue;
+        }
+        appendAvail(i);
+        for (let q = 0; q < queue.length; q++) {
+            const item = queue[q];
+            appendLink();
+            appendNext(item.nu);
+            if (item.kind === "between") {
+                appendLink();
+                appendAvail(item.rightIdx);
+            }
+        }
+    }
+    for (let e = 0; e < appendEnd.length; e++) appendNext(appendEnd[e]);
+
+    nextEl.style.display = "flex";
     if (hotEl) hotEl._wgChips = chips;
+}
+
+// One locked "next" chip: same chip/tooltip markup as an available one (name/category/
+// effect/xpRequired), minus the click affordance (actionId is always 0, done is always
+// false) -- muted via .wg-chip-locked (CSS). Still shows the have/need XP fraction so
+// the player can see how far off it is.
+function buildNextChip(nu, spendableXp, est) {
+    const xp = nu.xpRequired | 0;
+    const chip = document.createElement("div");
+    chip.className = "wg-chip wg-chip-locked " + (xp >= 20000 ? "wg-chip-major" : "wg-chip-minor");
+    fillChipGlyph(chip, nu.icon, true);
+    const tip = document.createElement("div");
+    tip.className = "wg-chip-tip";
+    const cName = nu.name ? '<div class="wg-tip-name">' + escapeHtml(nu.name) + "</div>" : "";
+    const cCap = nu.category || L("headerSkillTree", "Upgrades");
+    const cTitle = capHtml(escapeHtml(cCap)) + cName;
+    const cBody = effectHtml(nu.effect);
+    const cIcon = (nu.icon && nu.icon.indexOf("img://") === 0) ? bgIconHtml(nu.icon) : "";
+    const cFoot = xpFracHtml(spendableXp, xp, xpCurrencyIcon(), undefined, est);
+    tip.innerHTML = joinSections([tipMain(cIcon, cTitle, cBody), cFoot]);
+    chip.appendChild(tip);
+    return { el: chip, tip: tip };
 }
 
 // COMPLETE ("Fully Progressed"): the row of FINISHED categories below the bar -- one box
@@ -1271,19 +1414,31 @@ function xpTotalHtml(xp) {
 // the Upgrades screen. Shared by the Next-available chips and the bar's skill-tree
 // final-upgrade tick. The frame shape (circle=minor / diamond=major) comes from the
 // box's own wg-chip-minor/-major class (CSS), so callers set that on `box`.
-function fillChipGlyph(box, iconUrl) {
+function fillChipGlyph(box, iconUrl, masked) {
     const frame = document.createElement("div");
     frame.className = "wg-chip-frame";
     const ico = document.createElement("div");
     ico.className = "wg-chip-ico";
-    if (iconUrl) ico.style.backgroundImage = "url('" + iconUrl + "')";
+    if (iconUrl) {
+        // Locked "next" chips (masked=true) render the perk art as a MASK over a
+        // flat gray fill (.wg-chip-locked .wg-chip-ico, CSS) instead of as color
+        // art, so the icon reads gray like its ring. grayscale() does not render
+        // in this Coherent build -- see the CSS comment for the fallback if mask
+        // doesn't either.
+        if (masked) {
+            ico.style.webkitMaskImage = "url('" + iconUrl + "')";
+            ico.style.maskImage = "url('" + iconUrl + "')";
+        } else {
+            ico.style.backgroundImage = "url('" + iconUrl + "')";
+        }
+    }
     box.appendChild(frame);
     box.appendChild(ico);
 }
 
 // Signature of the available-upgrade set, so render() can skip rebuilding identical
 // chips (a rebuild destroys the hovered chip's tooltip element).
-function upgradesSig(arr, spendableXp) {
+function upgradesSig(arr, spendableXp, nextArr) {
     const n = arrLen(arr);
     // spendableXp is folded in so the chips rebuild when affordability flips; it's
     // stable between unlock actions, so this doesn't cause per-push rebuild flicker.
@@ -1291,6 +1446,14 @@ function upgradesSig(arr, spendableXp) {
     for (let i = 0; i < n; i++) {
         const u = arrGet(arr, i);
         if (u) s += (u.actionId | 0) + "," + (u.xpRequired | 0) + "," + (u.done ? 1 : 0) + ";";
+    }
+    // Locked "next" chips + their parent links -- folded in so a wire change to the
+    // next-upgrade set (or its stepId/parentIds linkage) also triggers a rebuild.
+    const nn = arrLen(nextArr);
+    s += "|" + nn + ":";
+    for (let j = 0; j < nn; j++) {
+        const nu = arrGet(nextArr, j);
+        if (nu) s += (nu.stepId | 0) + "/" + nu.parentIds + "," + (nu.xpRequired | 0) + ";";
     }
     return s;
 }
@@ -1965,7 +2128,7 @@ function render(model) {
     // the `else` branch clears _wgChips, which would wipe the category row.
     const rowMode = mode === MODE.COMPLETE || (mode === MODE.SKILL_TREE && !onlyFinal);
     if (rowMode && nextEl) {
-        const sig = mode + ":" + upgradesSig(data.availUpgrades, spendableXp);
+        const sig = mode + ":" + upgradesSig(data.availUpgrades, spendableXp, data.nextUpgrades);
         if (nextEl._wgSig !== sig) {
             nextEl._wgSig = sig;
             setActiveChip(hotEl, null);
@@ -1975,7 +2138,8 @@ function render(model) {
                                    FORCE_COMPLETE ? FAKE_ELITE_MAX_LEVEL
                                                   : (data.eliteMaxLevel | 0), hotEl);
             } else {
-                renderNextAvailable(nextEl, data.availUpgrades, hotEl, spendableXp, battleEst);
+                renderNextAvailable(nextEl, data.availUpgrades, data.nextUpgrades,
+                                     hotEl, spendableXp, battleEst);
             }
         } else {
             nextEl.style.display = "flex";   // unchanged -> keep chips + tooltip, re-show

@@ -297,6 +297,63 @@ not-genuinely-complete vehicle carries contradicting real data:
 - **`FAKE_ELITE_MAX_LEVEL = 350`** (the EU 2.3 cap) for the badge, else a non-complete vehicle
   pushes its own lower `eliteMaxLevel` and understates it.
 
+## Skill-tree "next skills" chain — chip connectors
+**Visually confirmed in-client 2026-08-15 (user "LGTM")** — every finding below (mask tint,
+two-color state model, ring-inset connectors, fan-out column, below-node hover) is shipped
+render behavior, not a plan.
+- **The existing COMPLETE-mode connector doesn't fit.** The field-mod tooltip connector
+  (`completeHexRowHtml`, `.wg-tick-stem`/`.wg-tip-item-stem`) is a VERTICAL, single-stem-per-row,
+  filled-`<div>` primitive with NO branching — it cannot draw a two-parent fork, so the
+  skill-tree next-chain needed new markup rather than reusing it.
+- **New pattern: a HORIZONTAL in-flow flex connector, `.wg-chip-link`** — a filled `16rem x 2rem`
+  div (`rgba(178,175,171,0.45)`, drop-shadow; `.wg-large` restatement `24rem x 3rem`). Simpler
+  than the absolutely-positioned `.wg-tick-stem` because `.wg-next` is already `display:flex;
+  align-items:center`, so the connector just drops inline between chips.
+- **Mask tint CONFIRMED WORKING — supersedes any earlier "perk art can't be recolored" note.**
+  The locked next-chip icon renders as a flat gray silhouette via `-webkit-mask-image`/
+  `mask-image` (set to the perk-art URL, same as the color icon) + `background-color: #8C8C7E`
+  on `#wgmod-root .wg-chip-locked .wg-chip-ico`, with `mask-repeat:no-repeat;
+  mask-position:center; mask-size:contain`. In JS, `fillChipGlyph(box, iconUrl, masked)` sets
+  `mask-image` instead of `background-image` when `masked` is truthy; `buildNextChip` passes
+  `true`. So CSS `mask` DOES render in this Coherent build — there was **no precedent either
+  way** before this (the earlier `grayscale()`-doesn't-render finding was about a filter, not a
+  mask, and doesn't generalize to "recoloring is impossible"). A commented `filter:
+  brightness(0.45); opacity:0.75` dimming fallback sits below the mask rule in source, unused.
+- **Two-color state model** — the chip background is identical in both states; state reads only
+  via color. Available = gold `#FFDD99` ring (icon art stays full-color); next/locked = gray
+  `#8C8C7E` on the ring + the icon silhouette + the connectors. Ring/border thickness is `1rem`
+  (Large `1.5rem`), matching WG's own researched-node ring treatment.
+- **Ring-inset connector rule — every connector needs negative margins to reach the ring.** The
+  ring sits ~`2rem` inside the `30rem` `.wg-chip` box (minor ring `26rem`; Large `3rem` inside
+  `45rem`), so a connector drawn edge-to-edge of the box would visibly gap from the ring on both
+  ends. Fix on both axes: horizontal `.wg-chip-link` gets `margin-left:-10rem;
+  margin-right:-2rem` (Large `-15rem`/`-3rem`); vertical `.wg-chip-link-down` gets
+  `margin-top:-2rem; margin-bottom:-2rem` (Large `-3rem`). A diamond/major chip has only ~`1rem`
+  inset, so its connector may tuck ~`1rem` under the disc edge — accepted as-is, don't chase it
+  further.
+- **Fan-out column (one available node, two locked successors).** One successor renders to the
+  RIGHT via the horizontal `.wg-chip-link`; the second renders BELOW, inside a `.wg-chip-col`
+  (a flex column: parent chip → vertical `.wg-chip-link-down` → below chip). Left alone, the
+  taller column re-centers the whole `.wg-next` row vertically. Fix: `.wg-next` uses
+  `align-items:flex-start` (not `center`) plus a compensating `margin-top:14rem` (Large
+  `21rem`) on the thin horizontal `.wg-chip-link` so its row still sits on the same centerline
+  as the rest of the fan-out.
+- **`.wg-hot` coverage assumption — below-node content needs its own hover hookup.** The single
+  transparent hit-test overlay (`pointer-events:auto`, hit-tests chips via a live
+  `getBoundingClientRect`) only extends ~`39rem` below the bar, sized for ONE horizontal chip
+  row. The fan-out's below-node chip sits ~`76rem` down, outside that band, so it never gets a
+  `mousemove` and never hovers. Fix pattern used here: re-enable `pointer-events:auto` on that
+  one chip specifically (`.wg-chip-col-hot`) with its own `mouseenter`/`mouseleave` routed into
+  the existing `setActiveChip`, rather than growing `.wg-hot` itself (which would punch a dead
+  zone over the hangar UI below the bar).
+- **Two-parent placement (`<>-[]-<>`)**: when both of a next chip's parents resolve to adjacent
+  available-chip indices, `renderNextAvailable` (`WGModResearch.js`) emits
+  parentA-link-nextchip-link-parentB. Tangled / non-adjacent / 3+-parent cases fall back to a
+  single connector off the first parent (ponytail-commented in the source; an SVG-overlay
+  upgrade path is noted there for a real multi-parent fork if ever needed).
+- `renderNextAvailable` owns this whole render; the rebuild-skip signature `upgradesSig` now
+  folds `data.nextUpgrades` too, so a next-chain-only change still triggers a chip rebuild.
+
 ## Buff lines (tooltip KPI rows)
 Each buff/KPI line in `effect` / `optionEffects` is an ENRICHED RECORD from Python
 (`icon \x1f cls \x1f value \x1f desc`, `cls` = `pos`/`neg`) so a tooltip buff renders like the

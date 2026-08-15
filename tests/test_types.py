@@ -57,3 +57,19 @@ def test_avg_battle_xp_defaults_to_zero_and_carries():
                                  fill_vehicle=0, fill_free=0, ticks=[],
                                  avg_battle_xp=850)
     assert m2.avg_battle_xp == 850
+
+
+def test_progression_step_parent_ids_defaults_empty_and_independent():
+    a = t.ProgressionStep(step_id=1, name="", icon="", xp_cost=0, unlocked=False)
+    b = t.ProgressionStep(step_id=2, name="", icon="", xp_cost=0, unlocked=False)
+    assert a.parent_ids == []
+    a.parent_ids.append(7)
+    assert b.parent_ids == []  # distinct instances must not share the default list
+
+
+def test_snapshot_and_model_next_upgrades_default_empty():
+    s = t.VehicleSnapshot(tier=10, is_elite=True, vehicle_xp=0, free_xp=0)
+    assert s.skilltree_next == []
+    m = t.ResearchProgressModel(mode=t.Mode.SKILL_TREE, scale_min=0, scale_max=0,
+                                fill_vehicle=0, fill_free=0, ticks=[])
+    assert m.next_upgrades == []

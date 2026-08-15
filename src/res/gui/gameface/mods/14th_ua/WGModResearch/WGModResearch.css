@@ -1476,14 +1476,17 @@
     margin-right: 8rem;
     pointer-events: none;       /* visual only; .wg-hot hit-tests + handles hover/click */
 }
-/* frame: a thin light ring over a translucent dark disc, centered in the box --
-   matching the Upgrades screen (minor = circle, major = diamond). */
+/* frame: a thin ring over a translucent dark disc, centered in the box -- matching
+   the Upgrades screen (minor = circle, major = diamond). Ring color is the
+   available/next state signal (see .wg-chip-locked below); the disc fill is
+   shared by both states so only the ring (and, by extension, the perk art it
+   frames) reads as gold-vs-gray. */
 #wgmod-root .wg-chip-frame {
     position: absolute;
     left: 50%;
     top: 50%;
     background: rgba(12, 12, 14, 0.55);
-    border: 2rem solid rgba(237, 230, 217, 0.6);
+    border: 1rem solid #FFDD99;    /* available: WG's own researched-node gold border, verbatim */
     box-shadow: 0 0 3rem rgba(0, 0, 0, 0.8);
 }
 #wgmod-root .wg-chip-minor .wg-chip-frame {     /* circle (minor, 10k) */
@@ -1519,6 +1522,115 @@
     height: 13rem;
     margin: -6.5rem 0 0 -6.5rem;
 }
+
+/* Skill-tree "next" chips: still-locked nodes one hop past the available frontier
+   (actionId 0, not clickable). Same frame markup as an available chip, same disc
+   fill -- the ring goes WG's muted gray token, AND (unlike an earlier revision of
+   this file) the perk art itself is now also grayed: fillChipGlyph(el, url, true)
+   (WGModResearch.js) loads the icon as a MASK instead of a background-image, and
+   .wg-chip-locked .wg-chip-ico below fills the masked shape with the same gray as
+   the ring. This is a flat ALPHA-SHAPE silhouette -- internal art shading is lost
+   by design, same tradeoff as any mask. grayscale() does NOT render in this
+   Coherent build (confirmed elsewhere in this file), which is why mask is used
+   instead of a filter. */
+#wgmod-root .wg-chip-locked .wg-chip-frame {
+    border-color: #8C8C7E;
+}
+#wgmod-root .wg-chip-locked .wg-chip-ico {
+    background-image: none;
+    background-color: #8C8C7E;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+}
+/* Fallback if mask does not render in this Coherent build: comment out the
+   .wg-chip-locked .wg-chip-ico rule above, drop the `true` masked arg off the
+   fillChipGlyph(chip, nu.icon, true) call in buildNextChip() (WGModResearch.js)
+   so the icon goes back to a normal background-image, then uncomment this --
+   the same dim mute already proven live on .wg-tick.wg-locked. It darkens the
+   art rather than truly graying it, but it definitely renders.
+#wgmod-root .wg-chip-locked .wg-chip-ico {
+    filter: brightness(0.45);
+    opacity: 0.75;
+}
+*/
+
+/* Connector from an available chip to its locked "next" chip(s). Reuses the bar's own
+   de-crowding stem RECIPE (.wg-tick-stem -- a plain FILLED div in the same gray;
+   Coherent ignores a border on it and won't render a gradient), just with HORIZONTAL
+   geometry instead of that stem's vertical one: this row is a flex row, so the
+   connector is simply an in-flow filled block sized/spaced like the chips either side
+   of it (its own margin-top centers it in the chip row -- see below). A convergent next
+   chip (two available parents) gets one of these on each side. `margin-left` cancels
+   the preceding .wg-chip's own margin-right (8rem) so the link butts flush against it
+   instead of leaving a visible gap; `margin-right: 0` means whatever follows (another
+   chip) starts flush against the link too -- the following chip's OWN margin-right is
+   what spaces it from the next element after that, unaffected. */
+#wgmod-root .wg-chip-link {
+    width: 16rem;
+    height: 2rem;
+    margin-left: -10rem;
+    margin-right: -2rem;
+    /* margin-top centers this thin bar within a 30rem chip band under the row's new
+       align-items:flex-start (see .wg-next below) -- value-neutral vs the old
+       align-items:center (that only ever centered same-height 30rem items anyway):
+       (30 - 2) / 2 = 14rem. Restated x1.5 in .wg-large. */
+    margin-top: 14rem;
+    background: #8C8C7E;     /* same gray token as the locked ring/icon */
+    filter: drop-shadow(0 0 1rem rgba(0, 0, 0, 0.7));
+    pointer-events: none;
+}
+
+/* Fan-out column: one available parent with a SECOND locked "next" chip hung directly
+   below it (see renderNextAvailable's appendAvailColumn) instead of chained inline to
+   the right. A nested flex COLUMN inside the row's flex ROW -- not absolute positioning
+   with auto-margin centering, which this Coherent build does not render reliably (see
+   the .wg-tip-xp-tail note further down). align-items:center centers the link + bottom
+   chip under the parent; margin-right stands in for the parent .wg-chip's own row-spacing
+   margin (zeroed below so it doesn't ALSO apply inside the column, which would skew the
+   centering). Restated x1.5 in .wg-large. */
+#wgmod-root .wg-chip-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 8rem;
+}
+#wgmod-root .wg-chip-col .wg-chip {
+    margin-right: 0;
+}
+/* Vertical connector -- the .wg-chip-link recipe with axes swapped: width = line
+   thickness, height = the vertical gap between the parent chip and the chip hung below
+   it. The column has no built-in gap between its flex children, so unlike the
+   horizontal link there's no inter-chip margin to cancel -- but the visible ring still
+   sits inset inside the chip box, so this needs its own negative top/bottom margins to
+   pull into both rings (see below). Restated x1.5 in .wg-large. */
+#wgmod-root .wg-chip-link-down {
+    width: 2rem;
+    height: 16rem;
+    /* Pull into both rings: the visible minor ring sits ~2rem inside the 30rem chip
+       box (26rem ring -> 2rem inset top/bottom), so without this the connector butts
+       the box and leaves a gap to the ring -- same inset issue as .wg-chip-link's own
+       negative margins above, just on the vertical axis (no inter-chip margin to
+       cancel here, only the ring inset each end). Restated x1.5 in .wg-large. */
+    margin-top: -2rem;
+    margin-bottom: -2rem;
+    background: #8C8C7E;
+    filter: drop-shadow(0 0 1rem rgba(0, 0, 0, 0.7));
+    pointer-events: none;
+}
+
+/* Fan-out column's BELOW chip only (see renderNextAvailable's appendAvailColumn): it
+   sits below .wg-hot's flat coverage, so unlike every other chip (visual-only, hit-tested
+   by .wg-hot via chipAt) this one needs to catch its own hover directly. No fixed rem
+   dims here -- pointer-events/cursor don't scale, so no .wg-large restatement needed. */
+#wgmod-root .wg-chip-col-hot {
+    pointer-events: auto;
+    cursor: default;
+}
+
 /* COMPLETE ("Fully Progressed"): one finished-category box in the below-bar row. The box
    itself IS a .wg-chip (size, spacing, pointer-events, its nested .wg-chip-tip tooltip and
    the .wg-large restatement all come free); this only fills it with the category's section
@@ -1689,7 +1801,15 @@
    skill_tree mode (JS sets display:flex). Mirrors the .wg-hot overlay (the proven-
    interactive pattern): pointer-events:auto + a z-index above it so the chips
    reliably receive hover/click. Content-width (right:auto) so it only covers the
-   chips, not the whole strip. */
+   chips, not the whole strip.
+   align-items:flex-start (was :center): a fan-out .wg-chip-col is taller than a plain
+   30rem chip, and center-aligning the ROW would recenter every item (including the
+   column) around the new taller midpoint -- pushing the column's OWN top content
+   (the parent chip) off the other chips' shared position instead of hanging the extra
+   height below it. flex-start pins every item's top edge together (value-neutral for
+   all EXISTING same-height items -- see .wg-chip-link's own margin-top compensating
+   for the one item that relied on center, the thin connector bar), and lets the
+   fan-out column's extra content (link-down + second chip) extend downward only. */
 #wgmod-root .wg-next {
     position: absolute;
     left: 0;
@@ -1697,7 +1817,7 @@
     top: 100%;
     margin-top: 4rem;
     display: none;
-    align-items: center;
+    align-items: flex-start;
     z-index: 5;                 /* paints above .wg-hot so the chips are visible... */
     pointer-events: none;       /* ...but events pass through to .wg-hot, which hit-tests them */
 }
@@ -2142,7 +2262,7 @@
     margin-right: 12rem;
 }
 #wgmod-root.wg-large .wg-chip-frame {
-    border-width: 3rem;
+    border-width: 1.5rem;
 }
 #wgmod-root.wg-large .wg-chip-minor .wg-chip-frame {
     width: 39rem;
@@ -2163,6 +2283,22 @@
     width: 19.5rem;
     height: 19.5rem;
     margin: -9.75rem 0 0 -9.75rem;
+}
+#wgmod-root.wg-large .wg-chip-link {
+    width: 24rem;
+    height: 3rem;
+    margin-left: -15rem;
+    margin-right: -3rem;
+    margin-top: 21rem;      /* (45 - 3) / 2, the Large chip band */
+}
+#wgmod-root.wg-large .wg-chip-col {
+    margin-right: 12rem;
+}
+#wgmod-root.wg-large .wg-chip-link-down {
+    width: 3rem;
+    height: 24rem;
+    margin-top: -3rem;      /* 1.5x: Large box 45rem, minor ring 39rem -> 3rem inset */
+    margin-bottom: -3rem;
 }
 #wgmod-root.wg-large .wg-final {
     margin-top: 6rem;

@@ -287,6 +287,23 @@ def test_skill_tree_available_defaults_empty():
     assert m.avail_upgrades == []
 
 
+def test_skill_tree_carries_next_upgrades():
+    # Locked successors one hop past the frontier flow through to the model as
+    # next_upgrades, preserving identity + the accumulated parent_ids (the "available
+    # -- next" chains the widget draws).
+    nxt = [t.ProgressionStep(11, "Improved Suspension", "ic11.png", 15000,
+                             unlocked=False, parent_ids=[7])]
+    m = build_model(_skill_snap(done=5, total=26, skilltree_next=nxt))
+    assert m.mode == t.Mode.SKILL_TREE
+    assert [n.step_id for n in m.next_upgrades] == [11]
+    assert m.next_upgrades[0].parent_ids == [7]
+
+
+def test_skill_tree_next_upgrades_defaults_empty():
+    m = build_model(_skill_snap(done=10, total=26))
+    assert m.next_upgrades == []
+
+
 def test_skill_tree_takes_priority_over_field_mods():
     # Defensive: even if linear field-mod steps were somehow present, a skill-tree
     # vehicle shows the upgrade readout (the adapter also zeroes the linear read).

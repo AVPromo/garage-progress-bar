@@ -73,8 +73,8 @@ def build_snapshot():
     is_skill_tree = _is_skill_tree(veh)
     fm_steps, fm_done, fm_total = _read_post_progression(veh)
     (st_total_xp, st_spent_xp, st_done, st_total, st_final_icon,
-     st_final_name, st_final_xp, st_final_effect, st_available) = (
-        _read_skill_tree(veh) if is_skill_tree else (0, 0, 0, 0, "", "", 0, "", []))
+     st_final_name, st_final_xp, st_final_effect, st_available, st_next) = (
+        _read_skill_tree(veh) if is_skill_tree else (0, 0, 0, 0, "", "", 0, "", [], []))
     prestige = _read_prestige(veh)
 
     int_cd = _safe_int(lambda: veh.intCD, 0)
@@ -112,6 +112,7 @@ def build_snapshot():
         skilltree_final_icon=st_final_icon, skilltree_final_name=st_final_name,
         skilltree_final_xp=st_final_xp, skilltree_final_effect=st_final_effect,
         skilltree_available=st_available,
+        skilltree_next=st_next,
         vehicle_int_cd=int_cd,
         avg_battle_xp=avg_xp,
         battle_count=battle_count,

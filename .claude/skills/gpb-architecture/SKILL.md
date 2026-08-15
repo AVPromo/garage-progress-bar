@@ -438,6 +438,29 @@ tank now shows Fully Progressed instead of the Elite bar.)
   The JS `window` `resize` listener is the primary self-heal; these are the backstop. See gpb-widget
   for the JS `applyPosition` rescale/adopt logic.
 
+## Skill-tree "next skills" chain (locked successors one hop past the frontier)
+- **The engine's post-progression GRAPH API is now USED by this mod**:
+  `PostProgressionStepItem.getNextStepIDs()` (→ successor step ids, backed by
+  `descriptor.unlocks`) and `getParentStepID()`/`getParentStepIDs()` (→
+  `descriptor.requiredUnlocks`). `adapter/skill_tree_read.py` does a SECOND pass over the
+  available frontier: for each available step it calls `getNextStepIDs()`, loads each successor
+  via `pp.getStep(next_id)`, keeps only the STILL-LOCKED ones, and dedupes a shared
+  (convergent) successor down to one node that accumulates its `parent_ids`. A "next" node uses
+  an **OR unlock rule** — one parent unlocking it is enough to make it available next.
+- **New wire shapes.** `NextUpgradeVM` (`actionId=0, icon, name, xpRequired, effect, category,
+  done=False, stepId, parentIds`), carried on `ResearchVM.nextUpgrades`; the existing available
+  `UpgradeVM` gained a `stepId` field too. **Deliberate `stepId`-vs-`actionId` split**:
+  `actionId` legitimately reads `0` for non-clickable rows (COMPLETE's finished-category
+  breakdown, and now the next chips), so `stepId` is the stable link key used to connect a next
+  node back to its parent(s) — never repurpose `actionId` for that. `parentIds` is a
+  **comma-joined string** (`"1023"` or `"1023,1044"`), the same packed-string idiom already used
+  for `availModes`.
+- **Testability boundary, unchanged**: the bridge VM layer (`bridge/view_models.py` Wulf VM
+  classes + `bridge/gameface_bridge.py` marshal loop) is NOT unit-testable in this repo —
+  `frameworks.wulf`/`BigWorld` are never stubbed. Domain tests can reach
+  `ResearchProgressModel`/`skill_tree_read` output, but NOT the actual VM property push or the
+  `parentIds` comma-join — those need in-client (prober) verification.
+
 ## Key data types
 `VehicleSnapshot` (adapter output / domain input), `ResearchProgressModel` (builder output →
 bridge writes into `ResearchVM`), `Tick` (`category` drives glyph + clickability; `action_id`

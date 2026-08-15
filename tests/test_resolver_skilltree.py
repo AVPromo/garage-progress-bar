@@ -89,3 +89,24 @@ def test_only_final_tick_carries_icon():
 def test_missing_final_icon_leaves_last_tick_iconless():
     res = skilltree.resolve(_snap(done=10, total=26, final_icon=""))
     assert res["ticks"][-1].icon == ""
+
+
+def test_next_upgrades_pass_through_with_parent_ids():
+    # Locked successors one hop past the frontier ride through as ProgressionStep,
+    # carrying the accumulated parent_ids (one or two, the tree's OR-rule) and never
+    # marked as a session "done" marker.
+    nxt = [t.ProgressionStep(step_id=42, name="Turbocharger", icon="img://n.png",
+                             xp_cost=15000, unlocked=False, parent_ids=[7, 3])]
+    snap = _snap(done=10, total=26)
+    snap.skilltree_next = nxt
+    res = skilltree.resolve(snap)
+    ups = res["next_upgrades"]
+    assert len(ups) == 1
+    assert ups[0].step_id == 42
+    assert ups[0].parent_ids == [7, 3]
+    assert ups[0].done is False
+
+
+def test_next_upgrades_defaults_empty():
+    res = skilltree.resolve(_snap(done=10, total=26))
+    assert res["next_upgrades"] == []

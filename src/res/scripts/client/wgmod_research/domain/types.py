@@ -135,7 +135,7 @@ class ProgressionStep(object):
     """A field-modification step (post-progression tree node, paid with XP)."""
     def __init__(self, step_id, name, icon, xp_cost, unlocked, level=0,
                  options=None, description="", option_effects=None, category="",
-                 done=False, selected_idx=-1):
+                 done=False, selected_idx=-1, parent_ids=None):
         self.step_id = step_id
         self.name = name
         self.icon = icon
@@ -163,6 +163,10 @@ class ProgressionStep(object):
         # chip for a node just unlocked via the bar -> sorted first + open-screen
         # click. False for ordinary available-upgrade chips.
         self.done = done
+        # NEXT-node only: step_ids of the AVAILABLE frontier node(s) that unlock this
+        # still-locked successor (1 or 2 -- the skill tree's OR-rule: either parent
+        # unlocks it). Empty for an available-frontier ProgressionStep itself.
+        self.parent_ids = parent_ids or []
 
 
 class EliteGrade(object):
@@ -208,7 +212,7 @@ class VehicleSnapshot(object):
                  skilltree_spent_xp=0, skilltree_done=0, skilltree_total=0,
                  skilltree_final_icon="", skilltree_final_name="",
                  skilltree_final_xp=0, skilltree_available=None,
-                 skilltree_final_effect="", vehicle_int_cd=0,
+                 skilltree_final_effect="", skilltree_next=None, vehicle_int_cd=0,
                  avg_battle_xp=0, battle_count=0, account_avg_battle_xp=0,
                  reserve_mult=100, daily_double_factor=100, max_battle_xp=0,
                  is_premium=False):
@@ -259,6 +263,12 @@ class VehicleSnapshot(object):
         # the clickable "Upgrades Available:" chips. [ProgressionStep] (step_id,
         # name, icon, xp_cost). Empty for non-skill-tree vehicles.
         self.skilltree_available = skilltree_available or []
+        # Locked successors ONE HOP past the frontier (not received, not yet unlocked)
+        # -> the "available -- next" chains the widget draws. [ProgressionStep], each
+        # carrying `parent_ids` = the available-node step_id(s) that unlock it (1 or 2,
+        # OR-rule). Deduped by step_id: a successor reachable from two available parents
+        # appears ONCE with both parents listed. Empty for non-skill-tree vehicles.
+        self.skilltree_next = skilltree_next or []
         # The selected vehicle's global compact-descriptor id. Used only to scope
         # session "done" markers (adapter/recent.py) per vehicle -- the domain
         # itself never reads it. 0 when unavailable.
@@ -289,7 +299,8 @@ class ResearchProgressModel(object):
                  combat_xp=0, avail_upgrades=None, spendable_xp=0,
                  avg_battle_xp=0, battle_count=0, account_avg_battle_xp=0,
                  reserve_mult=100, daily_double_factor=100, max_battle_xp=0,
-                 avail_modes=None, progress_current=0, progress_required=0):
+                 avail_modes=None, progress_current=0, progress_required=0,
+                 next_upgrades=None):
         self.mode = mode
         self.scale_min = scale_min
         self.scale_max = scale_max
@@ -319,6 +330,10 @@ class ResearchProgressModel(object):
         # SKILL_TREE mode: available frontier upgrade nodes (clickable chips).
         # [ProgressionStep] (step_id, name, icon, xp_cost). Empty in other modes.
         self.avail_upgrades = avail_upgrades or []
+        # SKILL_TREE mode: locked successors one hop past the frontier (clickable-chain
+        # "next" chips, not themselves clickable). [ProgressionStep] (step_id, name,
+        # icon, xp_cost, parent_ids). Empty in other modes.
+        self.next_upgrades = next_upgrades or []
         # Historical average combat XP per random battle (from the snapshot). Carried
         # on every model so the view can estimate "battles remaining" beside an XP
         # shortfall in any mode's tooltip; 0 hides that estimate (no battles / unread).

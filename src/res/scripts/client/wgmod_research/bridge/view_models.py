@@ -98,7 +98,7 @@ class TickVM(ViewModel):
 
 class UpgradeVM(ViewModel):
     """One available tier-XI upgrade node -> a clickable 'Upgrades Available' chip."""
-    def __init__(self, properties=7, commands=0):
+    def __init__(self, properties=8, commands=0):
         super(UpgradeVM, self).__init__(properties=properties, commands=commands)
 
     def _initialize(self):
@@ -110,6 +110,10 @@ class UpgradeVM(ViewModel):
         self._addStringProperty("effect", "")      # 4 (perk KPI bonus lines, \n-joined)
         self._addStringProperty("category", "")    # 5 (localized node sub-heading caption)
         self._addBoolProperty("done", False)       # 6 (session "done" marker: green check + open-screen click)
+        self._addNumberProperty("stepId", 0)       # 7 (the node's own step_id -- stable link
+                                                    #    target for NextUpgradeVM.parentIds;
+                                                    #    unlike actionId this is NEVER 0'd out
+                                                    #    for a non-actionable record, e.g. COMPLETE)
 
     def setActionId(self, v):
         self._setNumber(0, v)
@@ -132,9 +136,62 @@ class UpgradeVM(ViewModel):
     def setDone(self, v):
         self._setBool(6, v)
 
+    def setStepId(self, v):
+        self._setNumber(7, v)
+
+
+class NextUpgradeVM(ViewModel):
+    """One LOCKED tier-XI upgrade node one hop past the frontier -> a non-clickable
+    'next' chip the widget chains off its available parent(s). Mirrors UpgradeVM's
+    fields (actionId is always 0 -- a next node isn't individually actionable) plus
+    `stepId` (this node's own id) and `parentIds` (comma-joined available-node
+    step_ids that unlock it -- 1 or 2, the tree's OR-rule; packed-string convention,
+    same as ResearchVM.availModes)."""
+    def __init__(self, properties=9, commands=0):
+        super(NextUpgradeVM, self).__init__(properties=properties, commands=commands)
+
+    def _initialize(self):
+        super(NextUpgradeVM, self)._initialize()
+        self._addNumberProperty("actionId", 0)    # 0 (always 0 -- not clickable)
+        self._addStringProperty("icon", "")        # 1 (img:// URL)
+        self._addStringProperty("name", "")        # 2
+        self._addNumberProperty("xpRequired", 0)   # 3
+        self._addStringProperty("effect", "")      # 4 (perk KPI bonus lines, \n-joined)
+        self._addStringProperty("category", "")    # 5 (localized node sub-heading caption)
+        self._addBoolProperty("done", False)       # 6 (always False -- no done marker for a locked node)
+        self._addNumberProperty("stepId", 0)       # 7 (this node's own step_id)
+        self._addStringProperty("parentIds", "")   # 8 (comma-joined available-node step_ids, 1 or 2)
+
+    def setActionId(self, v):
+        self._setNumber(0, v)
+
+    def setIcon(self, v):
+        self._setString(1, v)
+
+    def setName(self, v):
+        self._setString(2, v)
+
+    def setXpRequired(self, v):
+        self._setNumber(3, v)
+
+    def setEffect(self, v):
+        self._setString(4, v)
+
+    def setCategory(self, v):
+        self._setString(5, v)
+
+    def setDone(self, v):
+        self._setBool(6, v)
+
+    def setStepId(self, v):
+        self._setNumber(7, v)
+
+    def setParentIds(self, v):
+        self._setString(8, v)
+
 
 class ResearchVM(ViewModel):
-    def __init__(self, properties=38, commands=8):
+    def __init__(self, properties=39, commands=8):
         super(ResearchVM, self).__init__(properties=properties, commands=commands)
 
     def _initialize(self):
@@ -182,6 +239,9 @@ class ResearchVM(ViewModel):
         self._addNumberProperty("progressRequired", 0)  # 35 (required XP figure; <= 0 hides the "/" and "%")
         self._addNumberProperty("progressMode", 0)      # 36 (0 = Current, 1 = Current / Required)
         self._addBoolProperty("showPercent", False)     # 37 ("Show Progress %" setting)
+        self._addArrayProperty("nextUpgrades", Array())  # 38 ([NextUpgradeVM] -- locked
+                                                          #     successors one hop past the
+                                                          #     frontier, SKILL_TREE mode only)
         # Reverse channel: JS click handlers invoke these commands. Each returns a
         # command object that connect_commands() wires to a Python handler. Wulf
         # delivers the JS-supplied argument(s) to those handlers.
@@ -268,6 +328,9 @@ class ResearchVM(ViewModel):
     def getAvailUpgrades(self):
         return self._getArray(15)
 
+    def getNextUpgrades(self):
+        return self._getArray(38)
+
     def setSpendableXp(self, v):
         self._setNumber(16, v)
 
@@ -317,3 +380,7 @@ class ResearchVM(ViewModel):
     @staticmethod
     def getAvailUpgradesType():
         return UpgradeVM
+
+    @staticmethod
+    def getNextUpgradesType():
+        return NextUpgradeVM

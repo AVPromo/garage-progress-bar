@@ -60,4 +60,6 @@ def resolve(snapshot):
         "ticks": ticks,
         # frontier nodes (not received, prereqs met) -> clickable header chips.
         "avail_upgrades": list(snapshot.skilltree_available or []),
+        # locked successors one hop past the frontier -> the "available -- next" chains.
+        "next_upgrades": list(snapshot.skilltree_next or []),
     }

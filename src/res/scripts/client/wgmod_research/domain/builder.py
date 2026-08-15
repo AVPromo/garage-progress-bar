@@ -130,6 +130,7 @@ def _b_skill(snapshot, ctx, enabled):
         fieldmods_done=st["done"], fieldmods_total=st["total"],
         vehicle_class=ctx["veh_class"], spendable_xp=ctx["spendable"],
         avail_upgrades=st.get("avail_upgrades", []),
+        next_upgrades=st.get("next_upgrades", []),
         progress_current=snapshot.skilltree_spent_xp,
         progress_required=snapshot.skilltree_total_xp, **ctx["est"]))
 

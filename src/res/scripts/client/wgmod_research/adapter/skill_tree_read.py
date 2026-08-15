@@ -89,13 +89,44 @@ def is_skill_tree(veh):
         return False
 
 
+def _skilltree_fields(action, node_type):
+    """The common ProgressionStep fields shared by an available-frontier node and a
+    locked next-hop successor: localized name, icon, effect text, and the node's own
+    category sub-heading. Factored out so both callers stay in lockstep."""
+    image_name = _safe(lambda: action.getImageName(), "") or ""
+    # The node's OWN category (single key from getCategories()) -> its localized
+    # Upgrades-screen sub-heading (e.g. "Category: Firepower", "Mechanic Upgrade").
+    cat_key = _safe(lambda: sorted(action.getCategories())[0], "") or ""
+    return dict(
+        name=_skilltree_name(action, node_type),
+        icon=_skilltree_icon(node_type, image_name),
+        description=_skilltree_effect(action),
+        category=i18n.skilltree_category(cat_key))
+
+
+def _priced_step(step):
+    """(node_type, xp_cost) for a step, or None if it's a ghost layout placeholder or
+    carries no price (not a purchasable upgrade node) -- the same exclusion the main
+    dedup loop applies. Never raises."""
+    node_type = _safe(lambda: step.getType(), "") or ""
+    if node_type == "ghost":
+        return None
+    price = step.getPrice()
+    xp_cost = int(getattr(price, "xp", 0) or 0)
+    if xp_cost <= 0:
+        return None
+    return node_type, xp_cost
+
+
 def read_skill_tree(veh):
     """Aggregate the branching skill tree into
     (total_xp, spent_xp, done, total, final_icon, final_name, final_xp, final_effect,
-    available). The bar stays a COUNT
+    available, next_nodes). The bar stays a COUNT
     readout (owner directive: non-linear tree), but `available` carries the frontier
     nodes (not received, prerequisites met) as [ProgressionStep] for the clickable
-    "Upgrades Available:" chips. done/total
+    "Upgrades Available:" chips, and `next_nodes` carries their still-LOCKED immediate
+    successors (one hop past the frontier) so the widget can draw "available -- next"
+    chains. done/total
     are the priced, non-ghost nodes unlocked vs. available; final_icon is the
     'final' node's art (img:// URL) for the rightmost tick. total_xp/spent_xp are
     retained for completeness but no longer drive the (count-based) bar.
@@ -111,7 +142,17 @@ def read_skill_tree(veh):
     incoming parent edge -- a node with two parents is yielded twice (verified live:
     Hirschkaefer yields 32 steps for 26 unique nodes). We dedupe by stepID, else
     both the cost and the N/M count are inflated. Fully guarded -> (0,...,"") on
-    any failure (bar falls back to COMPLETE)."""
+    any failure (bar falls back to COMPLETE).
+
+    Next-hop successors: PostProgressionStepItem.getNextStepIDs() returns the node's
+    descriptor.unlocks (verified against the decompiled EU 2.3 client); each id is
+    loaded back through pp.getStep(id) (the same accessor iterOrderedSteps() itself
+    uses). A successor is kept only while it is STILL LOCKED (not received, not yet
+    unlocked) -- one that already unlocked belongs on the frontier, not the "next"
+    chain. Reachable from two available parents -> ONE record, both parent step_ids
+    in `parent_ids` (the tree's OR-rule: either parent alone unlocks it). Every
+    per-successor step is independently guarded so one bad id degrades to "skip it",
+    never to dropping the whole available bar."""
     total_xp = 0
     spent_xp = 0
     done = 0
@@ -121,6 +162,7 @@ def read_skill_tree(veh):
     final_xp = 0
     final_effect = ""
     available = []
+    available_steps = []  # [(step_id, step)] -- the frontier, for the next-hop pass below
     seen = set()
     try:
         pp = veh.postProgression
@@ -147,19 +189,11 @@ def read_skill_tree(veh):
                     # (isUnlocked() resolves the DAG parent rule). These become the
                     # clickable "Upgrades Available:" chips. isLocked() is its inverse
                     # (prereqs not met) -- verified live: only reachable nodes are
-                    # isUnlocked. getImageName() is the perk basename -> full URL via
-                    # _skilltree_icon; the localized name is generic, so humanize it.
-                    image_name = _safe(lambda: step.action.getImageName(), "") or ""
-                    # The node's OWN category (single key from getCategories()) -> its
-                    # localized Upgrades-screen sub-heading (e.g. "Category: Firepower",
-                    # "Mechanic Upgrade", "Special Upgrade").
-                    cat_key = _safe(lambda: sorted(step.action.getCategories())[0], "") or ""
+                    # isUnlocked.
                     available.append(t.ProgressionStep(
-                        step_id=step_id, name=_skilltree_name(step.action, node_type),
-                        icon=_skilltree_icon(node_type, image_name),
-                        xp_cost=xp_cost, unlocked=False,
-                        description=_skilltree_effect(step.action),
-                        category=i18n.skilltree_category(cat_key)))
+                        step_id=step_id, xp_cost=xp_cost, unlocked=False,
+                        **_skilltree_fields(step.action, node_type)))
+                    available_steps.append((step_id, step))
                 # the signature 'final' upgrade -> its icon + name + cost for the end
                 # tick (which carries a tooltip like the available chips).
                 if node_type == "final" and not final_icon:
@@ -173,11 +207,48 @@ def read_skill_tree(veh):
             except Exception:
                 LOG_CURRENT_EXCEPTION()
                 continue
+
+        # Second pass: one hop past the frontier -- each available node's still-locked
+        # successors, deduped by step_id across shared (two-parent) nodes.
+        next_nodes = []
+        next_by_id = {}
+        for avail_id, step in available_steps:
+            try:
+                next_ids = step.getNextStepIDs() or ()
+            except Exception:
+                LOG_CURRENT_EXCEPTION()
+                continue
+            for next_id in next_ids:
+                try:
+                    rec = next_by_id.get(next_id)
+                    if rec is not None:
+                        rec.parent_ids.append(avail_id)
+                        continue
+                    succ = pp.getStep(next_id)
+                    if succ is None or bool(succ.isReceived()) or _safe(
+                            lambda: succ.isUnlocked(), False):
+                        continue  # already received / already on the frontier -> not "next"
+                    priced = _priced_step(succ)
+                    if priced is None:
+                        continue
+                    succ_type, succ_xp = priced
+                    if succ_type == "final":
+                        continue  # tree terminal sink, already shown as the final end-tick; never a "next" chip
+                    rec = t.ProgressionStep(
+                        step_id=next_id, xp_cost=succ_xp, unlocked=False,
+                        parent_ids=[avail_id],
+                        **_skilltree_fields(succ.action, succ_type))
+                    next_by_id[next_id] = rec
+                    next_nodes.append(rec)
+                except Exception:
+                    LOG_CURRENT_EXCEPTION()
+                    continue
+
         return (total_xp, spent_xp, done, total, final_icon, final_name, final_xp,
-                final_effect, available)
+                final_effect, available, next_nodes)
     except Exception:
         LOG_CURRENT_EXCEPTION()
-        return 0, 0, 0, 0, "", "", 0, "", []
+        return 0, 0, 0, 0, "", "", 0, "", [], []
 
 
 def _skilltree_effect(action):

@@ -33,7 +33,8 @@ from wgmod_research.domain.constants import Category
 from wgmod_research.domain.placement import choose_placement, INJECT, BLOCKED
 from wgmod_research.domain.types import Mode
 from wgmod_research.bridge import mod_settings
-from wgmod_research.bridge.view_models import ResearchVM, TickVM, UpgradeVM
+from wgmod_research.bridge.view_models import (
+    ResearchVM, TickVM, UpgradeVM, NextUpgradeVM)
 from wgmod_research.bridge.wulf_args import (
     cmd_int_arg as _cmd_int_arg, cmd_xy_arg as _cmd_xy_arg,
     cmd_wh_arg as _cmd_wh_arg, cmd_str_arg as _cmd_str_arg)
@@ -821,7 +822,24 @@ def push(rvm, host_vm=None):
                 uv.setEffect(getattr(up, "description", "") or "")
                 uv.setCategory(getattr(up, "category", "") or "")
                 uv.setDone(bool(getattr(up, "done", False)))
+                uv.setStepId(getattr(up, "step_id", 0) or 0)
                 ua.addViewModel(uv)
             ua.invalidate()
+            # Locked successors one hop past the frontier -> the "available -- next"
+            # chains (SKILL_TREE only; empty everywhere else).
+            na = tx.getNextUpgrades()
+            na.clear()
+            for nx in getattr(model, "next_upgrades", None) or []:
+                nv = NextUpgradeVM()
+                nv.setIcon(getattr(nx, "icon", "") or "")
+                nv.setName(getattr(nx, "name", "") or "")
+                nv.setXpRequired(getattr(nx, "xp_cost", 0) or 0)
+                nv.setEffect(getattr(nx, "description", "") or "")
+                nv.setCategory(getattr(nx, "category", "") or "")
+                nv.setStepId(getattr(nx, "step_id", 0) or 0)
+                nv.setParentIds(",".join(
+                    str(pid) for pid in (getattr(nx, "parent_ids", None) or [])))
+                na.addViewModel(nv)
+            na.invalidate()
     except Exception:
         LOG_CURRENT_EXCEPTION()
