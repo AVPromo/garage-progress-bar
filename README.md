@@ -15,7 +15,7 @@ stock progress bars. It updates live as you switch vehicles or earn XP.
 - **Field Modifications** — the post-progression upgrade ladder.
 - **Elite Levels (prestige)** — the current grade-band progression once a vehicle is elite.
 - **Tier XI exclusive rewards** — the milestone reward roadmap earned on Tier XI vehicles.
-- **Tier XI skill tree** — how many skill-tree upgrades you've unlocked out of the total.
+- **Tier XI skill tree** — how many skill-tree upgrades you've unlocked out of the total, plus the next locked upgrades one step ahead, connected to the unlocked skill they build on.
 - **Potential Tier XI** — an opt-in projection on Tier X vehicles that have no Tier XI of their own, measuring your banked XP against the Tier XI unlock cost.
 - **Fully Progressed** — a golden bar once nothing is left to research, upgrade, or unlock, listing every finished progression type with its total XP cost. Each type's tooltip itemizes what was completed and what each item cost: the researched items, every Field Modification level, the skill tree's final upgrade, and each exclusive reward with the level it unlocks at. On Tier XI vehicles the header carries the same unlocked/total skill counter the Tier XI skill tree bar shows.
 
@@ -36,7 +36,7 @@ upgrades without leaving the Garage. **Hover** any tick or icon for a tooltip.
 
 ![The bar showing the Tier XI exclusive-rewards roadmap, with a tooltip](assets/img/en/elite-rewards.png)
 
-**Tier XI skill tree** — skill-tree upgrades unlocked out of the total on a Tier XI vehicle:
+**Tier XI skill tree** — skill-tree upgrades unlocked out of the total on a Tier XI vehicle, with the next locked upgrades shown ahead and linked to the unlocked skill they build on:
 
 ![The bar showing Tier XI skill-tree upgrades, with a tooltip](assets/img/en/skill-tree.png)
 
@@ -140,7 +140,7 @@ Building, deploying, testing, and the repo layout are documented in
 - **Польові модифікації** — рівні вдосконалень після завершення прокачування.
 - **Елітні рівні (престиж)** — поточний прогрес за грейдами після досягнення елітності.
 - **Ексклюзивні нагороди XI рівня** — дорожня карта нагород для техніки XI рівня.
-- **Дерево навичок XI рівня** — скільки вдосконалень дерева навичок відкрито із загальної кількості.
+- **Дерево навичок XI рівня** — скільки вдосконалень дерева навичок відкрито із загальної кількості, а також наступні заблоковані вдосконалення на крок вперед, з'єднані з відкритою навичкою, на якій вони базуються.
 - **Потенційний XI рівень** — опційна проекція для техніки X рівня, яка не має власного XI рівня: показує накопичений досвід відносно вартості відкриття XI рівня.
 - **Повністю пройдено** — золота смуга, коли вже нічого досліджувати, вдосконалювати чи відкривати: перелічує кожен завершений тип прогресу з підсумковою вартістю в досвіді. Підказка кожного типу деталізує, що саме завершено і скільки це коштувало: досліджені елементи, кожен рівень Польових модифікацій, фінальне вдосконалення дерева навичок і кожну ексклюзивну нагороду з рівнем, на якому вона відкривається. На техніці XI рівня в заголовку показано той самий лічильник навичок, що й у смузі дерева навичок XI рівня.
 
@@ -162,7 +162,7 @@ Building, deploying, testing, and the repo layout are documented in
 
 ![Смуга з дорожньою картою ексклюзивних нагород XI рівня та підказкою](assets/img/ua/elite-rewards.png)
 
-**Дерево навичок XI рівня** — відкриті вдосконалення із загальної кількості на техніці XI рівня:
+**Дерево навичок XI рівня** — відкриті вдосконалення із загальної кількості на техніці XI рівня, з наступними заблокованими вдосконаленнями попереду, з'єднаними з відкритою навичкою, на якій вони базуються:
 
 ![Смуга з вдосконаленнями дерева навичок XI рівня та підказкою](assets/img/ua/skill-tree.png)
 
