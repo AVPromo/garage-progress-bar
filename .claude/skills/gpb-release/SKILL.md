@@ -108,6 +108,16 @@ from the tag + the fixed name `GarageProgressBar-Setup-<version>.exe`
 (`SetupBaseName`/`OutputBaseFilename` in `wgmod-setup.iss`). Keep the tag `vX.Y.Z` and this
 filename, or older installers can't fetch the new build.
 
+## Lessons from the v2.1.0/v3.0.0 mix-up
+- **Find the true latest version before cutting a release.** `git describe --tags` (or
+  bumping from `main`'s last-seen version) only finds the latest ANCESTOR tag — it stays
+  blind to a divergent, higher-numbered tag/release cut on another branch. Run
+  `gh release list` (or list ALL tags) first. Missing this shipped a v2.1.0 lower than an
+  already-existing, unmerged v3.0.0.
+- **A history reset/rebase must re-check gitignored dist-adjacent docs.** `dist\INSTALL.txt`
+  and `RESEARCH.md` sit outside version control, so a `main` reset silently leaves them on
+  the pre-reset version/client strings — bump/verify them by hand after any reset.
+
 ## Machine state
 - `gh` at `C:\Program Files\GitHub CLI\gh`, authed as 14th_ua.
 - `ISCC.exe` at `%LOCALAPPDATA%\Programs\Inno Setup 6\` (Find-ISCC checks there).
