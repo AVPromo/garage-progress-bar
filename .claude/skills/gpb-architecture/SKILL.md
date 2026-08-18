@@ -17,6 +17,9 @@ src/res/scripts/client/
   gui/mods/mod_wgmod.py               # ENTRY POINT — monkey-patches a hangar sub-view
   wgmod_research/
     _compat.py                        # engine shims: LOG_* fallbacks + _safe/_safe_int guards
+                                       #   owns the two log tiers (LOG_NOTE dev-gated / LOG_PROD
+                                       #   always-on) + auto-path-scrubbed LOG_CURRENT_EXCEPTION
+                                       #   -- full pattern in the wotmod-logger harness skill
     adapter/engine_adapter.py         # READ orchestrator: build_snapshot() composes the readers
     adapter/tech_read.py              #   reader: tech-tree modules + next vehicles
     adapter/post_progression_read.py  #   reader: linear field modifications

@@ -15,11 +15,9 @@ We recompute on vehicle change.
 
 OpenWG Gameface is a hard dependency. Python 2.7 (BigWorld) runtime.
 """
-# LOG_CURRENT_EXCEPTION straight from the engine (always on, error paths only);
-# LOG_NOTE via _compat so it goes through the same _DEBUG gate as the rest of the mod
-# and never spams a player's python.log on the normal path.
-from debug_utils import LOG_CURRENT_EXCEPTION
-from wgmod_research._compat import LOG_NOTE
+# Both via _compat: LOG_CURRENT_EXCEPTION so its traceback is path-scrubbed before it
+# ever reaches the player's python.log; LOG_PROD for the always-on boot marker below.
+from wgmod_research._compat import LOG_CURRENT_EXCEPTION, LOG_PROD
 
 MOD_NAME = "Garage Progress Bar"
 MOD_VERSION = "3.2.0"
@@ -80,7 +78,7 @@ def _install():
     # Arm once now (for the install that happens while already in the hangar);
     # each patched _onLoading re-arms on every subsequent mount.
     bridge.install_all_listeners()
-    LOG_NOTE("[%s] v%s installed (collision-aware sub-view inject + data)" % (
+    LOG_PROD("[%s] v%s installed (collision-aware sub-view inject + data)" % (
         MOD_NAME, MOD_VERSION))
 
 

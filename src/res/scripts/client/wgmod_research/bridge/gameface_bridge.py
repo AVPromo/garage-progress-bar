@@ -23,7 +23,7 @@ from helpers import dependency
 from skeletons.gui.game_control import ILoadoutController
 from skeletons.gui.shared import IItemsCache
 
-from wgmod_research._compat import LOG_CURRENT_EXCEPTION, LOG_NOTE
+from wgmod_research._compat import LOG_CURRENT_EXCEPTION, LOG_NOTE, LOG_PROD
 from wgmod_research.adapter import engine_adapter
 from wgmod_research.adapter import actions
 from wgmod_research.adapter import i18n
@@ -358,7 +358,7 @@ def _arm(label, get_holder, attr, handler):
         if event is not None and handler not in event:
             event += handler
             setattr(holder, attr, event)
-            LOG_NOTE("[wgmod] %s listener (re)armed" % label)
+            LOG_PROD("[wgmod] %s listener (re)armed" % label)
     except Exception:
         LOG_CURRENT_EXCEPTION()
 
@@ -373,7 +373,7 @@ def _arm_gui_resetters():
         from gui import g_guiResetters
         if _on_gui_reset not in g_guiResetters:
             g_guiResetters.add(_on_gui_reset)
-            LOG_NOTE("[wgmod] gui-resetter listener (re)armed")
+            LOG_PROD("[wgmod] gui-resetter listener (re)armed")
     except Exception:
         LOG_CURRENT_EXCEPTION()
 
@@ -441,7 +441,7 @@ def _record_click(int_cd):
 def _on_research_unlock(*args):
     try:
         int_cd = _cmd_int_arg(args)
-        LOG_NOTE("[wgmod] researchUnlock intCD=%s" % int_cd)
+        LOG_PROD("[wgmod] researchUnlock intCD=%s" % int_cd)
         if int_cd:
             _record_click(int_cd)
             actions.research_unlock(int_cd)
@@ -452,7 +452,7 @@ def _on_research_unlock(*args):
 def _on_unlock_field_mod(*args):
     try:
         step_id = _cmd_int_arg(args)
-        LOG_NOTE("[wgmod] unlockFieldMod stepID=%s" % step_id)
+        LOG_PROD("[wgmod] unlockFieldMod stepID=%s" % step_id)
         if step_id:
             _record_click(step_id)
             actions.unlock_field_mod(step_id)
@@ -462,7 +462,7 @@ def _on_unlock_field_mod(*args):
 
 def _on_open_skill_tree(*args):
     try:
-        LOG_NOTE("[wgmod] openSkillTree")
+        LOG_PROD("[wgmod] openSkillTree")
         actions.open_skill_tree()
     except Exception:
         LOG_CURRENT_EXCEPTION()
@@ -470,7 +470,7 @@ def _on_open_skill_tree(*args):
 
 def _on_open_research(*args):
     try:
-        LOG_NOTE("[wgmod] openResearch")
+        LOG_PROD("[wgmod] openResearch")
         actions.open_research()
     except Exception:
         LOG_CURRENT_EXCEPTION()
@@ -482,7 +482,7 @@ def _on_buy_mount(*args):
     # it once it reads as owned on the next sync.
     try:
         int_cd = _cmd_int_arg(args)
-        LOG_NOTE("[wgmod] buyMount intCD=%s" % int_cd)
+        LOG_PROD("[wgmod] buyMount intCD=%s" % int_cd)
         if int_cd:
             actions.buy_and_mount(int_cd)
     except Exception:
@@ -491,7 +491,7 @@ def _on_buy_mount(*args):
 
 def _on_open_field_mods(*args):
     try:
-        LOG_NOTE("[wgmod] openFieldMods")
+        LOG_PROD("[wgmod] openFieldMods")
         actions.open_field_mods()
         # Clicking the field-mod done tick IS the visit -> drop its marker now. Guarded +
         # kind-scoped (a no-op for any other marker). Read the current vehicle intCD the
@@ -511,7 +511,7 @@ def _on_set_position(*args):
         # Capture viewport (px) the coords were measured at, so a pinned position can be
         # rescaled proportionally after a resolution / UI-scale change (see applyPosition).
         w, h = _cmd_wh_arg(args)
-        LOG_NOTE("[wgmod] setPosition x=%s y=%s w=%s h=%s" % (x, y, w, h))
+        LOG_PROD("[wgmod] setPosition x=%s y=%s w=%s h=%s" % (x, y, w, h))
         # A drag with a coord <= 0 is not a real placement: 0 is the auto sentinel, and the
         # _cmd_xy_arg failure signature is (0, 0). Dropping it keeps a bad measurement from
         # clobbering the stored position. (The widget only ever sends a real pin -- an auto
@@ -528,7 +528,7 @@ def _on_select_mode(*args):
     # Class-B (local-state) command -- the game fires no sync, so set_mode_override refreshes.
     try:
         mode = _cmd_str_arg(args)
-        LOG_NOTE("[wgmod] selectMode mode=%s intCD=%s" % (mode, _cur_int_cd))
+        LOG_PROD("[wgmod] selectMode mode=%s intCD=%s" % (mode, _cur_int_cd))
         # Only accept a real Mode string, and only when a vehicle is in view.
         if mode and mode in _KNOWN_MODES and _cur_int_cd:
             mod_settings.set_mode_override(_cur_int_cd, mode)
@@ -598,7 +598,7 @@ def note_mount(name, vm):
         # Our sub-view re-mounted with a fresh VM (e.g. after a battle). If a foreign
         # mod claimed it first this mount, yield rather than clobber; else re-inject.
         if has_inject_model(vm):
-            LOG_NOTE("[wgmod] sub-view '%s' claimed by another mod this mount -- yielding" % name)
+            LOG_PROD("[wgmod] sub-view '%s' claimed by another mod this mount -- yielding" % name)
             return None
         rvm = attach(vm)
         if rvm is not None:
@@ -615,14 +615,14 @@ def note_mount(name, vm):
             _placed_name = chosen
             _placed_vm = target
             if _candidate_order and chosen != _candidate_order[0]:
-                LOG_NOTE("[wgmod] preferred sub-view occupied by another mod; "
+                LOG_PROD("[wgmod] preferred sub-view occupied by another mod; "
                          "widget placed on fallback sub-view '%s'" % chosen)
             else:
-                LOG_NOTE("[wgmod] widget placed on sub-view '%s'" % chosen)
+                LOG_PROD("[wgmod] widget placed on sub-view '%s'" % chosen)
             return (target, rvm)
         return None
     if action == BLOCKED:
-        LOG_NOTE("[wgmod] WARNING: all candidate sub-views are claimed by other mods; "
+        LOG_PROD("[wgmod] WARNING: all candidate sub-views are claimed by other mods; "
                  "bar hidden (injecting would clobber them -- last-writer-wins)")
     return None
 
@@ -653,7 +653,7 @@ def attach(host_vm):
 def refresh():
     """Re-push the current vehicle's model into the mounted widget."""
     if _active is None:
-        LOG_NOTE("[wgmod] refresh: no active widget")
+        LOG_PROD("[wgmod] refresh: no active widget")
         return False
     push(_active[1], host_vm=_active[0])
     return True

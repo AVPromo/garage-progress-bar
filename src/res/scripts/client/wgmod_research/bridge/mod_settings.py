@@ -60,7 +60,7 @@ checkbox is poor UX for a momentary action.
 The visibility decision itself is the engine-free `builder.bar_visible`; this module
 only owns the settings storage + the live-apply on change.
 """
-from wgmod_research._compat import LOG_CURRENT_EXCEPTION, LOG_NOTE
+from wgmod_research._compat import LOG_CURRENT_EXCEPTION, LOG_NOTE, LOG_PROD
 from wgmod_research.adapter import settings_i18n
 
 # Our mod's reverse-domain id, reused as the MSA "linkage" (panel identity / storage key).
@@ -471,7 +471,7 @@ def _sync_template_text(api):
                             changed = True
         if changed and hasattr(api, "saveState"):
             api.saveState()
-            LOG_NOTE("[wgmod] synced settings template text to client language")
+            LOG_PROD("[wgmod] synced settings template text to client language")
     except Exception:
         LOG_CURRENT_EXCEPTION()
 
@@ -514,7 +514,7 @@ def init():
         return
     g_modsSettingsApi = _primary_api()
     if g_modsSettingsApi is None:
-        LOG_NOTE("[wgmod] ModsSettingsAPI not present -- using default visibility "
+        LOG_PROD("[wgmod] ModsSettingsAPI not present -- using default visibility "
                  "(bar shown, no settings panel)")
         return
     try:
@@ -534,7 +534,7 @@ def init():
                     g_modsSettingsApi.saveState()
                 except Exception:
                     LOG_CURRENT_EXCEPTION()
-                LOG_NOTE("[wgmod] repaired settings (re-added 'enabled')")
+                LOG_PROD("[wgmod] repaired settings (re-added 'enabled')")
         else:
             # Fresh-install OR settingsVersion-bump path (getModSettings returned None).
             # Aslain's setModTemplate (decompiled api.py) RESETS every saved value to the
@@ -573,7 +573,7 @@ def init():
                         g_modsSettingsApi.saveState()
                     except Exception:
                         LOG_CURRENT_EXCEPTION()
-                    LOG_NOTE("[wgmod] migrated saved settings across a settingsVersion bump")
+                    LOG_PROD("[wgmod] migrated saved settings across a settingsVersion bump")
                 except Exception:
                     LOG_CURRENT_EXCEPTION()
         # Wire the panel's "reset to defaults" button. It fires onResetMod (NOT
@@ -631,7 +631,7 @@ def _subscribe_reset(api):
             return
         api.onResetMod += _on_reset
         _reset_hooked.add(id(api))
-        LOG_NOTE("[wgmod] onResetMod hooked on %s" % (type(api).__module__,))
+        LOG_PROD("[wgmod] onResetMod hooked on %s" % (type(api).__module__,))
     except Exception:
         LOG_CURRENT_EXCEPTION()
 
