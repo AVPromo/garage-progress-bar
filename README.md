@@ -82,7 +82,7 @@ with the defaults and no options. The controls sit in three categories:
 | | **Elite Rewards** | On | Shows the bar while an Elite Level reward is still to unlock. |
 | | **Elite System** | On | Shows the bar for Elite Level (prestige) progress. |
 | | **Fully Progressed** | On | Keeps the bar on vehicles with nothing left to research, upgrade, or unlock. Uncheck to hide it once a vehicle is fully progressed. |
-| | └ **Exclude Elite System** | Off | When a vehicle's only remaining progression is the Elite System grade band, shows the Fully Progressed bar instead of the Elite bar. Elite Rewards are unaffected. |
+| | **Allow Fallthrough** | Off | When on, the bar skips a disabled mode and shows the next available mode in priority order, instead of hiding the bar. |
 | **Formatting** | **Ignore Free XP** | Off | Counts only the combat XP you earn on each vehicle, dropping account-wide Free XP from the bar, totals, and tooltips. |
 | | **Show Progress %** | Off | Prepends a progress percentage to the XP readout. |
 | | **Progress Mode** | Current | What the XP readout shows — just the XP you have so far, or Current / Required. |
@@ -207,7 +207,7 @@ Building, deploying, testing, and the repo layout are documented in
 | | **Елітні нагороди** | Увімк. | Показує смугу, поки є нагорода елітного рівня, яку ще не відкрито. |
 | | **Елітна система** | Увімк. | Показує смугу для прогресу елітних рівнів (престижу). |
 | | **Повністю пройдено** | Увімк. | Лишає смугу на техніці, де вже нічого досліджувати, вдосконалювати чи відкривати. Зніміть позначку, щоб ховати її після повного проходження. |
-| | └ **Виключити систему «Еліта»** | Вимк. | Якщо на техніці лишився тільки прогрес елітних рівнів, показує смугу «Повністю пройдено» замість смуги елітної системи. На елітні нагороди не впливає. |
+| | **Дозволити резервний режим** | Вимк. | Якщо увімкнено, смуга пропускає вимкнений режим і показує наступний доступний режим за порядком пріоритету, замість того щоб ховатися. |
 | **Форматування** | **Ігнорувати вільний досвід** | Вимк. | Враховує лише бойовий досвід, зароблений на кожній техніці, виключаючи загальний вільний досвід зі смуги, підсумків і підказок. |
 | | **Показувати прогрес у %** | Вимк. | Додає відсоток прогресу перед лічильником досвіду. |
 | | **Режим прогресу** | Поточний | Що показує лічильник досвіду — лише наявний досвід чи «Поточний / Потрібно». |

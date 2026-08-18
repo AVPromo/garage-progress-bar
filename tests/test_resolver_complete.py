@@ -124,18 +124,25 @@ def test_an_unreadable_category_totals_zero_instead_of_being_dropped():
     assert complete.resolve(_snap(tier=None, fieldmods_done=3)) == []
 
 
-# --- exclude_elite_system: drops Mode.ELITE from the gate entirely -----------
+# --- `enabled` (Allow Fallthrough support) -----------------------------------
 
-def test_exclude_elite_system_lets_an_unfinished_elite_level_through():
-    # Without the flag this vetoes (see test_unfinished_elite_level_vetoes); with it on,
-    # ELITE is skipped altogether -- neither applies nor vetoes -- so the other four
-    # finished categories still report.
-    assert complete.resolve(_snap(elite_level=19), exclude_elite_system=True) == [
+def test_enabled_none_still_vetoes_on_an_unfinished_applicable_category():
+    # Default (no toggle threading -- the whole-vehicle gate): a category the player
+    # never disabled still vetoes COMPLETE while it's in progress, unchanged.
+    snap = _snap(elite_rewards=[t.EliteReward(10, False)])
+    assert complete.resolve(snap) == []
+    assert complete.resolve(snap, enabled=None) == []
+
+
+def test_disabled_unfinished_category_is_excluded_from_list_and_gate():
+    # Same snapshot, but the player switched ELITE_REWARDS off -- Allow Fallthrough
+    # threads `enabled` through, so the still-in-progress category is dropped from
+    # BOTH the all-done check and the returned list, letting the remaining
+    # all-done enabled categories win.
+    snap = _snap(elite_rewards=[t.EliteReward(10, False)])
+    enabled = {t.Mode.TECH_TREE, t.Mode.SKILL_TREE, t.Mode.FIELD_MODS, t.Mode.ELITE}
+    result = complete.resolve(snap, enabled=enabled)
+    assert result == [
         (t.Mode.TECH_TREE, 3000), (t.Mode.SKILL_TREE, 325000),
-        (t.Mode.FIELD_MODS, 3600), (t.Mode.ELITE_REWARDS, 1000)]
-
-
-def test_exclude_elite_system_still_lets_an_unclaimed_reward_veto():
-    # Mode.ELITE_REWARDS is untouched by the flag -- an unclaimed reward still vetoes.
-    assert complete.resolve(_snap(elite_rewards=[t.EliteReward(10, False)]),
-                            exclude_elite_system=True) == []
+        (t.Mode.FIELD_MODS, 3600), (t.Mode.ELITE, 9000)]
+    assert t.Mode.ELITE_REWARDS not in dict(result)

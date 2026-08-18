@@ -701,11 +701,7 @@ def push(rvm, host_vm=None):
         model = build_model(snap, mod_settings.enabled_modes(),
                             override=mod_settings.mode_override(_cur_int_cd),
                             ignore_free_xp=mod_settings.ignore_free_xp(),
-                            # Effective only while showWhenComplete is also on -- excluding
-                            # the Elite System with Fully Progressed off would just blank
-                            # the bar instead of suppressing anything.
-                            exclude_elite_system=(mod_settings.exclude_elite_system() and
-                                                  mod_settings.show_when_complete()))
+                            allow_fallthrough=mod_settings.allow_fallthrough())
         # Session "done" markers: promote a confirmed click and inject the current
         # vehicle's marker (a first tick / first chip). Engine-free + guarded.
         recent.decorate(model, snap)

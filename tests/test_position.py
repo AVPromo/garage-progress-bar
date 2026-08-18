@@ -200,7 +200,7 @@ def test_reset_returns_to_auto_not_seeded_px():
 
 # `helpers` is a game module absent under pytest, so settings_i18n.client_language()
 # fails soft to English -- _template() renders the English master here.
-_VARNAMES = {"showWhenComplete", "excludeEliteSystem", "ignoreFreeXp", "showPercent",
+_VARNAMES = {"showWhenComplete", "allowFallthrough", "ignoreFreeXp", "showPercent",
              "showTechTree", "showSkillTree", "showFieldMods", "showEliteRewards",
              "showElite", "showPotentialTierXI", "scale", "progressMode", "posX", "posY"}
 
@@ -214,7 +214,7 @@ _MODES = {"showTechTree", "showFieldMods", "showPotentialTierXI", "showSkillTree
 def test_template_structure_and_english_text():
     tpl = mod_settings._template()
     # Structure the host owns is language-independent.
-    assert tpl["settingsVersion"] == 13          # bumped for the excludeEliteSystem varName
+    assert tpl["settingsVersion"] == 14          # bumped for the allowFallthrough varName
     assert tpl["modDisplayName"] == "Garage Progress Bar"   # brand, never translated
     varnames = [c["varName"] for col in _COLUMNS for c in tpl[col] if "varName" in c]
     assert set(varnames) == _VARNAMES
@@ -231,21 +231,19 @@ def test_template_structure_and_english_text():
             assert c.get("text")
             assert bool(c.get("tooltip")) is (c["text"] not in headers)
     # column1 = the "Modes" header + the seven per-mode checkboxes, all STANDALONE (the
-    # showBar master is gone, so nothing carries a masterVarName any more) -- plus the one
-    # nested child, excludeEliteSystem, gated on showWhenComplete.
+    # showBar master is gone, so nothing carries a masterVarName any more) -- plus a
+    # spacer and the standalone allowFallthrough checkbox at the end (also no master).
     col1 = tpl["column1"]
     assert col1[0]["type"] == "Label" and col1[0]["text"] == u"<b>Modes</b>"
-    modes = col1[1:]
-    assert {c["varName"] for c in modes} == _MODES | {"excludeEliteSystem"}
+    assert col1[8] == {"type": "Empty", "height": 20}
+    modes = [c for c in col1[1:] if c["type"] != "Empty"]
+    assert {c["varName"] for c in modes} == _MODES | {"allowFallthrough"}
     for c in modes:
-        if c["varName"] == "excludeEliteSystem":
-            continue          # the one nested control -- exempt from the standalone check
         assert "masterVarName" not in c
-    assert modes[-1]["masterVarName"] == "showWhenComplete"
     # Mode order per spec.
     assert [c["varName"] for c in modes] == [
         "showTechTree", "showFieldMods", "showPotentialTierXI", "showSkillTree",
-        "showEliteRewards", "showElite", "showWhenComplete", "excludeEliteSystem"]
+        "showEliteRewards", "showElite", "showWhenComplete", "allowFallthrough"]
     # Mod-invented text comes from the tables (English in the test env).
     # column2 carries BOTH remaining categories, split by Empty spacers.
     col2 = tpl["column2"]

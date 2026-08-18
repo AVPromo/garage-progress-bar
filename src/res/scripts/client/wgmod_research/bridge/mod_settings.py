@@ -19,12 +19,12 @@ column3 would stack UNDER column1 instead of beside it.
                           showPotentialTierXI / showSkillTree / showEliteRewards / showElite
                           / showWhenComplete. enabled_modes() turns the first six into the
                           set of enabled Mode strings build_model consumes -- a vehicle whose
-                          resolved mode is off hides the bar (no fall-through) -- and
-                          showWhenComplete keeps the bar on fully-progressed (Mode.COMPLETE)
-                          vehicles. Plus one nested child, excludeEliteSystem (masterVarName
-                          showWhenComplete): suppresses Mode.ELITE so a vehicle whose only
-                          remaining progression is the grade band reaches COMPLETE instead
-                          (see domain.builder._b_elite / resolvers.complete).
+                          resolved mode is off hides the bar (no fall-through, unless
+                          allowFallthrough is on) -- and showWhenComplete keeps the bar on
+                          fully-progressed (Mode.COMPLETE) vehicles. Plus one standalone
+                          control at the end, allowFallthrough (default OFF): when on, the
+                          bar skips a disabled mode and shows the next available mode in
+                          priority order instead of hiding (see domain.builder.build_model).
 - column2 "Formatting" -- ignoreFreeXp / showPercent / progressMode: what the bar COUNTS and
                           how the XP readout READS. None of them gate visibility.
 - column2 "Layout"     -- after the spacer: the scale radio group, then a "Position"
@@ -32,10 +32,8 @@ column3 would stack UNDER column1 instead of beside it.
 
 There is deliberately NO master switch: the seven mode checkboxes already hide the bar
 everywhere once they're all off, so a separate showBar toggle was redundant the moment the
-master became a category header. The mode checkboxes are therefore plain standalone
-controls -- no masterVarName, nothing greyed. excludeEliteSystem is the one exception: it's
-a genuine child of showWhenComplete (greyed while Fully Progressed is off, since it only
-matters when COMPLETE can show at all).
+master became a category header. The mode checkboxes -- and allowFallthrough -- are
+therefore all plain standalone controls: no masterVarName, nothing greyed.
 
 Plus a draggable bar position, stored as two on-screen PIXEL coordinates:
 - posX -- the bar's CENTER-x in px (matches the CSS translateX(-50%) center-anchor).
@@ -80,12 +78,6 @@ DEFAULTS = {# showWhenComplete (default ON) keeps the bar on fully-progressed ve
             # INVERSE of the old hideWhenComplete flag, same net default behavior. See
             # bar_visible in domain/builder.py.
             "showWhenComplete": True,
-            # Child of showWhenComplete (masterVarName-gated) -- opt-in (default off):
-            # suppresses Mode.ELITE entirely, so a vehicle whose only remaining progression
-            # is the Elite System grade band shows Fully Progressed instead. Elite Rewards
-            # are unaffected. Effective only while showWhenComplete is also on (see
-            # gameface_bridge.push).
-            "excludeEliteSystem": False,
             # "Ignore Free XP" -- opt-in (default off): count only the combat XP earned on
             # each vehicle toward its progress, dropping the account-global free XP from the
             # bar, affordability, and tooltips (see domain.builder.build_model ignore_free_xp).
@@ -124,6 +116,11 @@ DEFAULTS = {# showWhenComplete (default ON) keeps the bar on fully-progressed ve
             # REPLACES the Elite-Levels bar. Unlike the toggles above, off does not hide
             # the bar -- it falls through to the normal Elite/COMPLETE behavior.
             "showPotentialTierXI": False,
+            # "Allow Fallthrough" -- opt-in (default off): when a vehicle's resolved mode is
+            # toggled off, show the next available mode in priority order instead of hiding
+            # the bar. Standalone control at the end of column1 "Modes" (see _template);
+            # allow_fallthrough() feeds domain.builder.build_model.
+            "allowFallthrough": False,
             # Per-vehicle "mode switch" selection: a JSON-string map {intCD: Mode} of the
             # non-default mode the player picked in the header switch for each vehicle. Not
             # a user-facing control (absent from _template, so no settingsVersion bump), but
@@ -294,7 +291,13 @@ def _template():
         # settings across losslessly.
         # Bumped 12 -> 13 when the "excludeEliteSystem" child CheckBox was added under
         # showWhenComplete (a new varName) -- mandatory per the ADDING-a-varName rule above.
-        "settingsVersion": 13,
+        # Bumped 13 -> 14: "excludeEliteSystem" was REMOVED (replaced by the standalone
+        # "allowFallthrough" checkbox, a general mode fall-through instead of an
+        # Elite-System-specific exclusion) -- removing a varName is mandatory per the
+        # REMOVING-a-varName rule, and adding the new one is too. Both default False and
+        # mean different things, so no value migration is attempted: the standard bump
+        # wipe simply drops the old key and seeds the new one at its default.
+        "settingsVersion": 14,
         "column1": [
             # CATEGORY "Modes" -- the seven per-mode toggles, order per spec: Research,
             # Field Modifications, Tier XI, Upgrades, Elite Rewards, Elite System, Fully
@@ -308,18 +311,14 @@ def _template():
             _mode(t, "showEliteRewards"),
             _mode(t, "showElite"),
             _mode(t, "showWhenComplete"),
-            # Child of showWhenComplete: suppresses Mode.ELITE so a vehicle whose only
-            # remaining progression is the grade band reaches COMPLETE instead. Unlike the
-            # standalone modes above, this one IS nested (masterVarName) -- greyed out while
-            # Fully Progressed is off, matching its "only matters when COMPLETE can show" rule.
-            {
-                "type": "CheckBox",
-                "text": t["excludeEliteSystem"]["text"],
-                "value": DEFAULTS["excludeEliteSystem"],
-                "tooltip": t["excludeEliteSystem"]["tooltip"],
-                "varName": "excludeEliteSystem",
-                "masterVarName": "showWhenComplete",
-            },
+            # Breathing room before the standalone allowFallthrough checkbox at the end of
+            # the column -- same shape as the column2 spacers. Textless/varName-less, so
+            # settings_i18n.COL1_KEYS holds a SPACER sentinel in this slot too.
+            {"type": "Empty", "height": 20},
+            # General mode fall-through: standalone (no masterVarName) -- unlike the old
+            # excludeEliteSystem it isn't a child of anything, it just changes what
+            # happens when a vehicle's resolved mode is disabled (see build_model).
+            _mode(t, "allowFallthrough"),
         ],
         "column2": [
             # CATEGORY "Formatting" -- what the bar COUNTS and how the readout READS.
@@ -762,12 +761,11 @@ def ignore_free_xp():
     return _settings["ignoreFreeXp"]
 
 
-def exclude_elite_system():
-    """"Exclude Elite System" child setting: True -> suppress Mode.ELITE so a vehicle
-    whose only remaining progression is the grade band reaches COMPLETE instead. Does
-    NOT affect Mode.ELITE_REWARDS. Effective only combined with show_when_complete()
-    (see gameface_bridge.push)."""
-    return _settings["excludeEliteSystem"]
+def allow_fallthrough():
+    """"Allow Fallthrough" setting: True -> when a vehicle's resolved mode is disabled,
+    the bar shows the next available mode in priority order instead of hiding (see
+    domain.builder.build_model)."""
+    return _settings["allowFallthrough"]
 
 
 def scale():

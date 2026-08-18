@@ -190,12 +190,7 @@ def _b_elite_rewards(snapshot, ctx, enabled):
 
 
 def _b_elite(snapshot, ctx, enabled):
-    # Prestige grade-band progression (the fallback prestige view). Entry-gated on the
-    # "Exclude Elite System" setting -- like _b_potential, this FALLS THROUGH (returns
-    # None) rather than hiding, so a vehicle whose only remaining progression is the
-    # grade band shows COMPLETE instead once every other applicable category is done.
-    if ctx.get("exclude_elite_system"):
-        return None
+    # Prestige grade-band progression (the fallback prestige view).
     if not snapshot.has_prestige:
         return None
     band = elite.resolve_grade_band(snapshot)
@@ -295,7 +290,7 @@ def _complete_effect(snapshot, mode):
 
 
 def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
-                exclude_elite_system=False):
+                allow_fallthrough=False):
     """`enabled` is the set of Mode strings the user has left ON (None = all on).
 
     `ignore_free_xp` (the "Ignore Free XP" setting) makes the bar behave as if the
@@ -308,17 +303,12 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
     needed. The battles estimate is already combat-XP-only; elite modes already force
     fill_free = 0.
 
-    `exclude_elite_system` (the "Exclude Elite System" setting) suppresses Mode.ELITE
-    entirely: `_b_elite` falls through (like `_b_potential`) instead of winning, and
-    `complete.resolve` drops ELITE from its category gate, so a vehicle whose only
-    remaining progression is the grade band reaches COMPLETE instead. It is the
-    caller's job to make it effective only while showWhenComplete is also on --
-    build_model just honors whatever it's handed.
-
     The default mode is resolved by the usual priority chain (the first applicable mode
-    in _BUILDERS); if that resolved mode is OFF, the bar is HIDDEN -- there is NO
-    fall-through to a lower-priority mode, and COMPLETE is reached only when the vehicle
-    is genuinely done (no branch matched).
+    in _BUILDERS). If that resolved mode is OFF: with `allow_fallthrough` False (the
+    default), the bar is HIDDEN -- no fall-through to a lower-priority mode; with it True
+    (the "Allow Fallthrough" setting), the bar instead walks the candidates in priority
+    order and shows the first one that IS enabled, or HIDDEN if none are. COMPLETE is
+    reached only when the vehicle is genuinely done (every applicable category finished).
 
     `override` is the player's per-vehicle "mode switch" choice (a Mode string). It is
     honored ONLY when it is among the AVAILABLE modes (applicable AND enabled) -- an
@@ -342,8 +332,7 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
     fm_total = snapshot.fieldmods_total
     veh_class = snapshot.vehicle_class
     ctx = {"fill_vehicle": fill_vehicle, "fill_free": fill_free, "spendable": spendable,
-           "est": est, "fm_done": fm_done, "fm_total": fm_total, "veh_class": veh_class,
-           "exclude_elite_system": exclude_elite_system}
+           "est": est, "fm_done": fm_done, "fm_total": fm_total, "veh_class": veh_class}
 
     def _placeholder(mode):
         # A model with no bar of its own, carrying only the shared fill/counter fields:
@@ -412,8 +401,11 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
     # applies at all). This is the widened COMPLETE gate: it no longer needs `cands` to be
     # empty, so a maxed-out prestige/skill-tree/rewards vehicle reaches COMPLETE too and
     # its finished categories can be reported. COMPLETE has no user toggle of its own
-    # (bar_visible's show_when_complete governs it), so toggles don't apply here.
-    done_cats = complete.resolve(snapshot, exclude_elite_system=exclude_elite_system)
+    # (bar_visible's show_when_complete governs it), so toggles don't apply here --
+    # EXCEPT under Allow Fallthrough: there a category the player switched OFF must not
+    # veto COMPLETE just because it's still in progress, so `enabled` is threaded through
+    # only in that case (plain default path keeps passing None, unchanged).
+    done_cats = complete.resolve(snapshot, enabled=enabled if allow_fallthrough else None)
     if override and override in avail:
         # Player's explicit choice among the available modes -- honored even if the
         # priority default is disabled (override is drawn from `avail`, i.e. enabled).
@@ -425,6 +417,10 @@ def build_model(snapshot, enabled=None, override=None, ignore_free_xp=False,
     elif not cands:
         # Nothing applies and nothing is readable: the old no-bar COMPLETE placeholder.
         result = _placeholder(t.Mode.COMPLETE)
+    elif allow_fallthrough:
+        # "Allow Fallthrough": `avail` is already the priority-ordered, enabled subset of
+        # `cands`, so its first entry (if any) IS the fallthrough winner -- no rescan needed.
+        result = by_mode[avail[0]] if avail else _placeholder(t.Mode.HIDDEN)
     else:
         winner_mode, winner_model = cands[0]
         # Honor the per-mode user toggle for the priority default: a mode this vehicle

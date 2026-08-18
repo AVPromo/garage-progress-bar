@@ -83,20 +83,22 @@ _CATEGORIES = (
 )
 
 
-def resolve(snapshot, exclude_elite_system=False):
+def resolve(snapshot, enabled=None):
     """``[(Mode string, total raw XP)]`` -- one entry per category that applies to this
     vehicle, ONLY when every one of them is finished. ``[]`` when something is still in
     progress, or when no category applies at all (the caller then keeps the old
     no-data COMPLETE placeholder). Never raises.
 
-    `exclude_elite_system` drops Mode.ELITE from the gate entirely (it neither applies
-    nor vetoes), so a vehicle whose only unfinished category is the grade band still
-    reaches COMPLETE. Mode.ELITE_REWARDS is untouched -- an unclaimed reward still
-    vetoes and still wins as a mode."""
+    `enabled` is the same Mode-string set/None the builder threads through everywhere
+    else (None means "all on"). When given, a category whose Mode is OFF is skipped
+    entirely -- excluded from both the all-done check and the returned list -- so
+    Allow Fallthrough can reach COMPLETE on the categories the player left ON even
+    while a still-in-progress category is disabled. Passing None (the default)
+    reproduces the old behavior byte-for-byte."""
     cats = []
     for mode, applies, probe in _CATEGORIES:
-        if exclude_elite_system and mode == t.Mode.ELITE:
-            continue
+        if enabled is not None and mode not in enabled:
+            continue                    # user disabled this category -> ignore it
         try:
             if not applies(snapshot):
                 continue

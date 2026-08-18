@@ -11,7 +11,7 @@ Scope, deliberately narrow:
      ``i18n.widget_labels()`` (``FEATURE_WG`` maps each checkbox → its widget-labels key),
      so they match the game exactly in every language and never drift.
   2. **Mod-invented labels** (the three category-header Labels "Modes"/"Formatting"/
-     "Layout", the ``showWhenComplete``/``excludeEliteSystem``/``ignoreFreeXp`` toggles,
+     "Layout", the ``showWhenComplete``/``allowFallthrough``/``ignoreFreeXp`` toggles,
      the "Position" section Label, the two position steppers) — bundled
      ``{lang: {key: label}}`` tables here, English master + per-key fallback.
 * **Tooltips ARE localized too**, from the lang-major ``_TOOLTIPS`` table (same 11 codes as
@@ -59,9 +59,10 @@ _FEATURE_EN = {
     u"showPotentialTierXI": u"Tier XI",
 }
 
-# Placeholder for a template row that carries NO text of its own -- the three `Empty`
-# spacers in column2 (between the Formatting and Layout groups, before the progressMode
-# radio group, and before the "Position" sub-header). _sync_template_text zips these key
+# Placeholder for a template row that carries NO text of its own -- the `Empty` spacer
+# before the standalone allowFallthrough checkbox in column1, and the three in column2
+# (between the Formatting and Layout groups, before the progressMode radio group, and
+# before the "Position" sub-header). _sync_template_text zips these key
 # tuples against the STORED components POSITIONALLY, so a textless row must still occupy a
 # slot: without it every key after the spacer would shift by one and silently relabel the
 # wrong controls. A module-level sentinel (not a bare None literal) so the intent reads at
@@ -86,7 +87,7 @@ HEADER_KEYS = frozenset((u"modes", u"formatting", u"layout"))
 # mod_settings._template()). The order here MUST match the wire order in _template().
 COL1_KEYS = (u"modes", u"showTechTree", u"showFieldMods", u"showPotentialTierXI",
              u"showSkillTree", u"showEliteRewards", u"showElite", u"showWhenComplete",
-             u"excludeEliteSystem")
+             SPACER, u"allowFallthrough")
 COL2_KEYS = (u"formatting", u"ignoreFreeXp", u"showPercent", SPACER, u"progressMode",
              SPACER, u"layout", u"scale", SPACER, u"position", u"posX", u"posY")
 
@@ -120,7 +121,7 @@ _LABELS = {
         u"formatting": u"Formatting",
         u"layout": u"Layout",
         u"showWhenComplete": u"Fully Progressed",
-        u"excludeEliteSystem": u"Exclude Elite System",
+        u"allowFallthrough": u"Allow Fallthrough",
         u"ignoreFreeXp": u"Ignore Free XP",
         u"showPercent": u"Show Progress %",
         u"progressMode": u"Progress Mode",
@@ -134,7 +135,7 @@ _LABELS = {
         u"formatting": u"Formatierung",
         u"layout": u"Layout",
         u"showWhenComplete": u"Vollständig fortgeschritten",
-        u"excludeEliteSystem": u"Elite-System ausschließen",
+        u"allowFallthrough": u"Fallback zulassen",
         u"ignoreFreeXp": u"Freie Erfahrung ignorieren",
         u"showPercent": u"Fortschritt in % anzeigen",
         u"progressMode": u"Fortschrittsmodus",
@@ -148,7 +149,7 @@ _LABELS = {
         u"formatting": u"Mise en forme",
         u"layout": u"Disposition",
         u"showWhenComplete": u"Entièrement progressé",
-        u"excludeEliteSystem": u"Exclure le système Élite",
+        u"allowFallthrough": u"Autoriser le repli",
         u"ignoreFreeXp": u"Ignorer l'expérience libre",
         u"showPercent": u"Afficher la progression en %",
         u"progressMode": u"Mode de progression",
@@ -162,7 +163,7 @@ _LABELS = {
         u"formatting": u"Formato",
         u"layout": u"Diseño",
         u"showWhenComplete": u"Progreso completo",
-        u"excludeEliteSystem": u"Excluir el sistema Élite",
+        u"allowFallthrough": u"Permitir alternativa",
         u"ignoreFreeXp": u"Ignorar la experiencia libre",
         u"showPercent": u"Mostrar el progreso en %",
         u"progressMode": u"Modo de progreso",
@@ -176,7 +177,7 @@ _LABELS = {
         u"formatting": u"Formattazione",
         u"layout": u"Disposizione",
         u"showWhenComplete": u"Completamente progredito",
-        u"excludeEliteSystem": u"Escludi il sistema Elite",
+        u"allowFallthrough": u"Consenti il ripiego",
         u"ignoreFreeXp": u"Ignora l'esperienza libera",
         u"showPercent": u"Mostra l'avanzamento in %",
         u"progressMode": u"Modalità di avanzamento",
@@ -190,7 +191,7 @@ _LABELS = {
         u"formatting": u"Formatowanie",
         u"layout": u"Układ",
         u"showWhenComplete": u"W pełni ukończone",
-        u"excludeEliteSystem": u"Wyklucz system Elite",
+        u"allowFallthrough": u"Zezwól na zastępstwo",
         u"ignoreFreeXp": u"Ignoruj wolne doświadczenie",
         u"showPercent": u"Pokaż postęp w %",
         u"progressMode": u"Tryb postępu",
@@ -204,7 +205,7 @@ _LABELS = {
         u"formatting": u"Formátování",
         u"layout": u"Rozvržení",
         u"showWhenComplete": u"Plně dokončeno",
-        u"excludeEliteSystem": u"Vyloučit systém Elite",
+        u"allowFallthrough": u"Povolit náhradu",
         u"ignoreFreeXp": u"Ignorovat volné zkušenosti",
         u"showPercent": u"Zobrazit postup v %",
         u"progressMode": u"Režim postupu",
@@ -218,7 +219,7 @@ _LABELS = {
         u"formatting": u"Форматирование",
         u"layout": u"Расположение",
         u"showWhenComplete": u"Полностью пройдено",
-        u"excludeEliteSystem": u"Исключить систему «Элита»",
+        u"allowFallthrough": u"Разрешить запасной режим",
         u"ignoreFreeXp": u"Игнорировать свободный опыт",
         u"showPercent": u"Показывать прогресс в %",
         u"progressMode": u"Режим прогресса",
@@ -232,7 +233,7 @@ _LABELS = {
         u"formatting": u"Форматування",
         u"layout": u"Розташування",
         u"showWhenComplete": u"Повністю пройдено",
-        u"excludeEliteSystem": u"Виключити систему «Еліта»",
+        u"allowFallthrough": u"Дозволити резервний режим",
         u"ignoreFreeXp": u"Ігнорувати вільний досвід",
         u"showPercent": u"Показувати прогрес у %",
         u"progressMode": u"Режим прогресу",
@@ -248,7 +249,7 @@ _LABELS = {
         u"formatting": u"Formázás",
         u"layout": u"Elrendezés",
         u"showWhenComplete": u"Teljesen kész",
-        u"excludeEliteSystem": u"Elit rendszer kizárása",
+        u"allowFallthrough": u"Tartalékmód engedélyezése",
         u"ignoreFreeXp": u"Szabad tapasztalat mellőzése",
         u"showPercent": u"Haladás megjelenítése %-ban",
         u"progressMode": u"Haladási mód",
@@ -262,7 +263,7 @@ _LABELS = {
         u"formatting": u"Biçimlendirme",
         u"layout": u"Yerleşim",
         u"showWhenComplete": u"Tamamen ilerlemiş",
-        u"excludeEliteSystem": u"Elit Sistemini Hariç Tut",
+        u"allowFallthrough": u"Yedek moda izin ver",
         u"ignoreFreeXp": u"Serbest deneyimi yok say",
         u"showPercent": u"İlerlemeyi % olarak göster",
         u"progressMode": u"İlerleme modu",
@@ -342,11 +343,10 @@ _TOOLTIPS = {
                               u"Keeps the bar visible on vehicles with nothing left to "
                               u"research, upgrade, or unlock. Uncheck to hide the bar once a "
                               u"vehicle is fully progressed."),
-        u"excludeEliteSystem": (u"Exclude Elite System",
-                                u"When a vehicle's only remaining progression is the Elite "
-                                u"System grade band, shows the Fully Progressed bar instead "
-                                u"of the Elite bar. Elite Rewards are unaffected. Off by "
-                                u"default."),
+        u"allowFallthrough": (u"Allow Fallthrough",
+                              u"When on, the bar skips a disabled mode and shows the next "
+                              u"available mode in priority order, instead of hiding the bar. "
+                              u"Off by default."),
         u"ignoreFreeXp": (u"Ignore Free XP",
                           u"Counts only the combat XP you earn on each vehicle toward its "
                           u"progress. Free XP is excluded from the bar, the totals, and the "
@@ -396,12 +396,11 @@ _TOOLTIPS = {
                               u"zu erforschen, zu modernisieren oder freizuschalten ist. "
                               u"Abwählen, um die Leiste bei vollständig fortgeschrittenen "
                               u"Fahrzeugen auszublenden."),
-        u"excludeEliteSystem": (u"Elite-System ausschließen",
-                                u"Wenn bei einem Fahrzeug nur noch die Stufenspanne des "
-                                u"Elite-Systems offen ist, wird die Leiste Vollständig "
-                                u"fortgeschritten anstelle der Elite-Leiste gezeigt. "
-                                u"Elite-Belohnungen sind davon nicht betroffen. "
-                                u"Standardmäßig aus."),
+        u"allowFallthrough": (u"Fallback zulassen",
+                              u"Wenn aktiviert, überspringt die Leiste einen deaktivierten "
+                              u"Modus und zeigt stattdessen den nächsten verfügbaren Modus in "
+                              u"der Prioritätsreihenfolge, statt sich auszublenden. "
+                              u"Standardmäßig aus."),
         u"ignoreFreeXp": (u"Freie Erfahrung ignorieren",
                           u"Rechnet nur die Gefechtserfahrung, die du mit dem jeweiligen "
                           u"Fahrzeug verdienst, in seinen Fortschritt ein. Freie Erfahrung "
@@ -456,11 +455,10 @@ _TOOLTIPS = {
                               u"Garde la barre visible sur les véhicules qui n'ont plus rien à "
                               u"rechercher, à moderniser ni à débloquer. Décochez pour masquer "
                               u"la barre dès qu'un véhicule est entièrement progressé."),
-        u"excludeEliteSystem": (u"Exclure le système Élite",
-                                u"Lorsque la seule progression restante d'un véhicule est la "
-                                u"plage de rangs du système Élite, affiche la barre Entièrement "
-                                u"progressé au lieu de la barre Élite. Les récompenses d'élite "
-                                u"ne sont pas concernées. Désactivé par défaut."),
+        u"allowFallthrough": (u"Autoriser le repli",
+                              u"Une fois activé, la barre ignore un mode désactivé et affiche "
+                              u"le mode disponible suivant par ordre de priorité, au lieu de se "
+                              u"masquer. Désactivé par défaut."),
         u"ignoreFreeXp": (u"Ignorer l'expérience libre",
                           u"Ne compte que l'expérience de combat gagnée sur chaque véhicule "
                           u"dans sa progression. L'expérience libre est exclue de la barre, "
@@ -514,11 +512,10 @@ _TOOLTIPS = {
                               u"queda nada por investigar, modernizar ni desbloquear. Desmarca "
                               u"para ocultar la barra cuando un vehículo tenga el progreso "
                               u"completo."),
-        u"excludeEliteSystem": (u"Excluir el sistema Élite",
-                                u"Cuando el único progreso que le queda a un vehículo es la "
-                                u"franja de niveles del sistema Élite, muestra la barra de "
-                                u"progreso completo en lugar de la barra Élite. Las recompensas "
-                                u"de élite no se ven afectadas. Desactivado por defecto."),
+        u"allowFallthrough": (u"Permitir alternativa",
+                              u"Cuando está activado, la barra omite un modo desactivado y "
+                              u"muestra el siguiente modo disponible por orden de prioridad, en "
+                              u"lugar de ocultarse. Desactivado por defecto."),
         u"ignoreFreeXp": (u"Ignorar la experiencia libre",
                           u"Cuenta solo la experiencia de combate que ganas con cada vehículo "
                           u"para su progreso. La experiencia libre queda excluida de la barra, "
@@ -575,11 +572,10 @@ _TOOLTIPS = {
                               u"da ricercare, ammodernare o sbloccare. Deseleziona per "
                               u"nascondere la barra quando un veicolo è completamente "
                               u"progredito."),
-        u"excludeEliteSystem": (u"Escludi il sistema Elite",
-                                u"Quando l'unico progresso rimasto a un veicolo è la fascia di "
-                                u"gradi del sistema Elite, mostra la barra Completamente "
-                                u"progredito invece della barra Elite. Le ricompense Elite non "
-                                u"sono interessate. Disattivato per impostazione predefinita."),
+        u"allowFallthrough": (u"Consenti il ripiego",
+                              u"Se attivo, la barra salta una modalità disattivata e mostra la "
+                              u"successiva modalità disponibile in ordine di priorità, invece "
+                              u"di nascondersi. Disattivato per impostazione predefinita."),
         u"ignoreFreeXp": (u"Ignora l'esperienza libera",
                           u"Conteggia solo l'esperienza di combattimento che guadagni su "
                           u"ciascun veicolo per il suo progresso. L'esperienza libera è esclusa "
@@ -634,11 +630,10 @@ _TOOLTIPS = {
                               u"Utrzymuje pasek widoczny na pojazdach, w których nie ma już nic "
                               u"do zbadania, zmodernizowania ani odblokowania. Odznacz, aby "
                               u"ukryć pasek, gdy pojazd jest w pełni ukończony."),
-        u"excludeEliteSystem": (u"Wyklucz system Elite",
-                                u"Gdy jedynym pozostałym postępem pojazdu jest zakres poziomów "
-                                u"systemu Elite, pokazuje pasek W pełni ukończone zamiast paska "
-                                u"Elite. Nagrody elitarne nie są tym objęte. Domyślnie "
-                                u"wyłączone."),
+        u"allowFallthrough": (u"Zezwól na zastępstwo",
+                              u"Gdy włączone, pasek pomija wyłączony tryb i pokazuje kolejny "
+                              u"dostępny tryb w kolejności priorytetu, zamiast się ukrywać. "
+                              u"Domyślnie wyłączone."),
         u"ignoreFreeXp": (u"Ignoruj wolne doświadczenie",
                           u"Do postępu każdego pojazdu wlicza tylko doświadczenie bojowe na nim "
                           u"zdobyte. Wolne doświadczenie jest pomijane na pasku, w sumach i w "
@@ -690,11 +685,10 @@ _TOOLTIPS = {
                               u"Nechá lištu zobrazenou u vozidel, u nichž už není co "
                               u"vyzkoumat, modernizovat ani odemknout. Odškrtnutím lištu "
                               u"skryjete, jakmile je vozidlo plně dokončeno."),
-        u"excludeEliteSystem": (u"Vyloučit systém Elite",
-                                u"Když je jediným zbývajícím postupem vozidla pásmo stupňů "
-                                u"systému Elite, zobrazí lištu Plně dokončeno místo lišty "
-                                u"Elite. Elitních odměn se to netýká. Ve výchozím nastavení "
-                                u"vypnuto."),
+        u"allowFallthrough": (u"Povolit náhradu",
+                              u"Je-li zapnuto, lišta přeskočí vypnutý režim a zobrazí další "
+                              u"dostupný režim podle pořadí priority, místo aby se skryla. Ve "
+                              u"výchozím nastavení vypnuto."),
         u"ignoreFreeXp": (u"Ignorovat volné zkušenosti",
                           u"Do postupu každého vozidla počítá jen bojové zkušenosti, které na "
                           u"něm získáte. Volné zkušenosti jsou vynechány z lišty, ze součtů i z "
@@ -744,11 +738,10 @@ _TOOLTIPS = {
                               u"Оставляет полосу на машинах, у которых больше нечего "
                               u"исследовать, модернизировать или открывать. Снимите отметку, "
                               u"чтобы скрывать полосу на полностью пройденных машинах."),
-        u"excludeEliteSystem": (u"Исключить систему «Элита»",
-                                u"Если у машины остался только диапазон рангов системы "
-                                u"«Элита», показывает полосу «Полностью пройдено» вместо полосы "
-                                u"«Элита». Элитных наград это не касается. По умолчанию "
-                                u"выключено."),
+        u"allowFallthrough": (u"Разрешить запасной режим",
+                              u"Если включено, полоса пропускает выключенный режим и "
+                              u"показывает следующий доступный режим по порядку приоритета, "
+                              u"вместо того чтобы скрываться. По умолчанию выключено."),
         u"ignoreFreeXp": (u"Игнорировать свободный опыт",
                           u"В прогресс каждой машины засчитывается только боевой опыт, "
                           u"полученный на ней. Свободный опыт не учитывается ни в полосе, ни в "
@@ -799,11 +792,10 @@ _TOOLTIPS = {
                               u"Залишає смугу на техніці, якій більше нічого досліджувати, "
                               u"модернізувати чи відкривати. Зніміть позначку, щоб ховати смугу "
                               u"на повністю пройденій техніці."),
-        u"excludeEliteSystem": (u"Виключити систему «Еліта»",
-                                u"Якщо в машини залишився лише діапазон рангів системи "
-                                u"«Еліта», показує смугу «Повністю пройдено» замість смуги "
-                                u"«Еліта». Елітних нагород це не стосується. За замовчуванням "
-                                u"вимкнено."),
+        u"allowFallthrough": (u"Дозволити резервний режим",
+                              u"Якщо увімкнено, смуга пропускає вимкнений режим і показує "
+                              u"наступний доступний режим за порядком пріоритету, замість того "
+                              u"щоб ховатися. За замовчуванням вимкнено."),
         u"ignoreFreeXp": (u"Ігнорувати вільний досвід",
                           u"У прогрес кожної машини зараховується лише бойовий досвід, здобутий "
                           u"на ній. Вільний досвід не враховується ні в смузі, ні в підсумках, "
@@ -855,11 +847,11 @@ _TOOLTIPS = {
                               u"nincs mit kutatni, korszerűsíteni vagy feloldani. Vedd ki a "
                               u"jelölést, hogy a sáv eltűnjön a teljesen kész "
                               u"harcjárműveken."),
-        u"excludeEliteSystem": (u"Elit rendszer kizárása",
-                                u"Ha egy harcjárműnek már csak az elit rendszer szintsávja van "
-                                u"hátra, a Teljesen kész sávot jeleníti meg az Elit sáv "
-                                u"helyett. Az elit jutalmakat ez nem érinti. Alapértelmezés "
-                                u"szerint kikapcsolva."),
+        u"allowFallthrough": (u"Tartalékmód engedélyezése",
+                              u"Ha be van kapcsolva, a sáv átugorja a kikapcsolt módot, és a "
+                              u"prioritási sorrend szerinti következő elérhető módot jeleníti "
+                              u"meg, ahelyett hogy elrejtőzne. Alapértelmezés szerint "
+                              u"kikapcsolva."),
         u"ignoreFreeXp": (u"Szabad tapasztalat mellőzése",
                           u"Az egyes harcjárművek haladásába csak a rajtuk szerzett harci "
                           u"tapasztalat számít bele. A szabad tapasztalat kimarad a sávból, az "
@@ -912,11 +904,10 @@ _TOOLTIPS = {
                               u"Araştırılacak, geliştirilecek veya açılacak bir şeyi kalmayan "
                               u"araçlarda çubuğu görünür tutar. Bir araç tamamen ilerlediğinde "
                               u"çubuğu gizlemek için işareti kaldırın."),
-        u"excludeEliteSystem": (u"Elit Sistemini Hariç Tut",
-                                u"Bir aracın kalan tek ilerlemesi Elit Sistemi seviye "
-                                u"aralığıysa, Elit çubuğu yerine Tamamen ilerlemiş çubuğunu "
-                                u"gösterir. Elit ödülleri bundan etkilenmez. Varsayılan olarak "
-                                u"kapalı."),
+        u"allowFallthrough": (u"Yedek moda izin ver",
+                              u"Açıkken, çubuk devre dışı bırakılmış bir modu atlar ve "
+                              u"gizlenmek yerine öncelik sırasına göre bir sonraki kullanılabilir "
+                              u"modu gösterir. Varsayılan olarak kapalı."),
         u"ignoreFreeXp": (u"Serbest deneyimi yok say",
                           u"Her aracın ilerlemesine yalnızca o araçla kazandığınız savaş "
                           u"deneyimi sayılır. Serbest deneyim çubuğa, toplamlara ve ipuçlarına "

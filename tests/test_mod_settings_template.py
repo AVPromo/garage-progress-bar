@@ -32,7 +32,7 @@ def _col1():
 
 # --- version ----------------------------------------------------------------
 
-def test_settings_version_is_13():
+def test_settings_version_is_14():
     # Bumped 9 -> 10 when the panel was restructured into three named categories and the
     # showBar master was REMOVED (the restructure alone wouldn't need it -- column identity
     # and masterVarName are absent from Aslain's template signature -- but dropping a
@@ -46,8 +46,10 @@ def test_settings_version_is_13():
     # _sync_template_text's positional zip against the new (longer) COL2_KEYS then
     # mislabels every row past the first new spacer (live regression). Then 12 -> 13 when
     # the "excludeEliteSystem" child CheckBox was added under showWhenComplete -- a new
-    # varName, so the bump is mandatory.
-    assert M._template()["settingsVersion"] == 13
+    # varName, so the bump was mandatory. Then 13 -> 14 when excludeEliteSystem was REMOVED
+    # (replaced by the standalone "allowFallthrough" checkbox) -- removing AND adding a
+    # varName, so this bump is mandatory too.
+    assert M._template()["settingsVersion"] == 14
 
 
 # --- category headers -------------------------------------------------------
@@ -123,17 +125,20 @@ def test_all_seven_modes_are_standalone_checkboxes():
             "mode %s must not be bound to a master" % c.get("varName"))
 
 
-def test_exclude_elite_system_is_a_child_of_show_when_complete():
-    # The one nested control in column1: gated on showWhenComplete (greyed while Fully
-    # Progressed is off), unlike the seven standalone modes above.
-    child = _col1()[8]
-    assert child["type"] == "CheckBox"
-    assert child["varName"] == "excludeEliteSystem"
-    assert child["masterVarName"] == "showWhenComplete"
+def test_allow_fallthrough_is_a_standalone_checkbox_after_a_spacer():
+    # column1 ends with an Empty spacer then the standalone allowFallthrough checkbox --
+    # NOT nested under anything (unlike the old excludeEliteSystem child it replaces).
+    col1 = _col1()
+    spacer = col1[8]
+    assert spacer == {"type": "Empty", "height": 20}
+    tail = col1[9]
+    assert tail["type"] == "CheckBox"
+    assert tail["varName"] == "allowFallthrough"
+    assert "masterVarName" not in tail
 
 
-def test_column1_is_header_plus_seven_modes_plus_one_child():
-    assert len(_col1()) == 9
+def test_column1_is_header_plus_seven_modes_plus_spacer_plus_allow_fallthrough():
+    assert len(_col1()) == 10
 
 
 def test_no_show_bar_leftover():
@@ -213,8 +218,8 @@ def test_potential_tier_xi_stays_opt_in():
     assert M.DEFAULTS["showPotentialTierXI"] is False
 
 
-def test_exclude_elite_system_defaults_off():
-    assert M.DEFAULTS["excludeEliteSystem"] is False
+def test_allow_fallthrough_defaults_off():
+    assert M.DEFAULTS["allowFallthrough"] is False
 
 
 def test_position_defaults_are_auto():
@@ -234,8 +239,11 @@ def test_no_legacy_hide_flags_remain():
 
 def test_mode_values_track_defaults():
     # Each mode checkbox's seeded value mirrors its DEFAULTS entry (so a fresh install
-    # renders with the right ticks -- notably potentialTierXI unticked).
+    # renders with the right ticks -- notably potentialTierXI and allowFallthrough
+    # unticked). Skips the Empty spacer, which carries no varName.
     for c in _col1()[1:]:
+        if c["type"] == "Empty":
+            continue
         var = c["varName"]
         assert c["value"] == M.DEFAULTS[var], (
             "mode %s value %r != default %r" % (var, c["value"], M.DEFAULTS[var]))
@@ -249,7 +257,7 @@ def test_mode_values_track_defaults():
 def test_col1_keys_match_template_wire_order():
     from wgmod_research.adapter import settings_i18n as S
     col1 = _col1()
-    assert list(S.COL1_KEYS) == ["modes"] + _MODE_ORDER + ["excludeEliteSystem"]
+    assert list(S.COL1_KEYS) == ["modes"] + _MODE_ORDER + [S.SPACER, "allowFallthrough"]
     assert len(col1) == len(S.COL1_KEYS)
     assert col1[0].get("varName") is None            # "modes" header -- no varName
     assert [c.get("varName") for c in col1[1:]] == list(S.COL1_KEYS)[1:]
@@ -406,15 +414,15 @@ def test_show_percent_reads_back_bool():
         M._apply({"showPercent": False})   # restore default for other tests
 
 
-# --- excludeEliteSystem checkbox (column1, child of showWhenComplete) -------
+# --- allowFallthrough checkbox (column1, standalone) ------------------------
 
-def test_exclude_elite_system_reads_back_bool():
-    assert M.exclude_elite_system() is False
-    M._apply({"excludeEliteSystem": True})
+def test_allow_fallthrough_reads_back_bool():
+    assert M.allow_fallthrough() is False
+    M._apply({"allowFallthrough": True})
     try:
-        assert M.exclude_elite_system() is True
+        assert M.allow_fallthrough() is True
     finally:
-        M._apply({"excludeEliteSystem": False})   # restore default for other tests
+        M._apply({"allowFallthrough": False})   # restore default for other tests
 
 
 # --- enabled_modes: the per-mode-toggle -> builder `enabled` set mapping -----

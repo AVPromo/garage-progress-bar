@@ -483,34 +483,37 @@ def test_elite_disabled_hides():
     assert m.mode == t.Mode.HIDDEN
 
 
-# --- "Exclude Elite System" setting (build_model exclude_elite_system) -----
-# Entry-gated on _b_elite (like _b_potential), so OFF falls THROUGH to COMPLETE
-# rather than hiding -- unlike the showElite toggle above, which HIDES.
+# --- "Allow Fallthrough" setting (build_model allow_fallthrough) -----------
+# Default (False): the priority winner's toggle governs alone -- disabled winner hides,
+# no fall-through (unchanged old behavior). True: walk `cands` in priority order and show
+# the first ENABLED one; HIDDEN only if none of them are.
 
-def test_exclude_elite_system_off_is_unchanged():
-    # Default (False): behaves exactly like test_elite_disabled_hides above.
+def test_allow_fallthrough_false_is_the_old_hide_behavior():
+    # Explicit default: identical to test_elite_disabled_hides -- no fall-through to
+    # a lower-priority candidate even though allow_fallthrough is passed (just False).
     snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, True)])
-    m = build_model(snap, _without(t.Mode.ELITE), exclude_elite_system=False)
+    m = build_model(snap, _without(t.Mode.ELITE), allow_fallthrough=False)
     assert m.mode == t.Mode.HIDDEN
 
 
-def test_exclude_elite_system_falls_through_to_complete():
-    # Rewards all earned -> without the flag this vehicle resolves to the grade band
-    # (ELITE); with it on, ELITE is suppressed and every OTHER applicable category
-    # (just the rewards track here) is already finished, so it reaches COMPLETE
-    # instead -- never HIDDEN.
-    snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, True)])
-    assert build_model(snap).mode == t.Mode.ELITE                    # sanity: normally ELITE
-    m = build_model(snap, exclude_elite_system=True)
-    assert m.mode == t.Mode.COMPLETE
+def test_allow_fallthrough_true_shows_the_next_enabled_candidate():
+    # A tech-tree tank with field mods also available: disabling TECH_TREE (the
+    # priority winner) with fallthrough on shows FIELD_MODS instead of hiding.
+    snap = t.VehicleSnapshot(
+        tier=10, is_elite=True, vehicle_xp=0, free_xp=0,
+        tech_unlocks=[_u(1, 5000)], field_mod_steps=[_step(1, 2000)])
+    assert build_model(snap).mode == t.Mode.TECH_TREE                # sanity: normally wins
+    m = build_model(snap, _without(t.Mode.TECH_TREE), allow_fallthrough=True)
+    assert m.mode == t.Mode.FIELD_MODS
 
 
-def test_exclude_elite_system_does_not_affect_elite_rewards():
-    # An unclaimed reward still wins as ELITE_REWARDS -- only Mode.ELITE is suppressed.
-    snap = _elite_snap(rewards=[t.EliteReward(50, True), t.EliteReward(100, False)],
-                       level_xp={12: 800000})
-    m = build_model(snap, exclude_elite_system=True)
-    assert m.mode == t.Mode.ELITE_REWARDS
+def test_allow_fallthrough_true_hides_when_no_candidate_is_enabled():
+    snap = t.VehicleSnapshot(
+        tier=10, is_elite=True, vehicle_xp=0, free_xp=0,
+        tech_unlocks=[_u(1, 5000)], field_mod_steps=[_step(1, 2000)])
+    m = build_model(snap, _without(t.Mode.TECH_TREE) - {t.Mode.FIELD_MODS},
+                    allow_fallthrough=True)
+    assert m.mode == t.Mode.HIDDEN
 
 
 def test_disabling_a_non_matching_higher_mode_is_a_no_op():
@@ -918,4 +921,55 @@ def test_complete_placeholder_when_no_category_applies():
     assert m.mode == t.Mode.COMPLETE
     assert (m.scale_min, m.scale_max) == (0, 0)
     assert m.avail_upgrades == []
+
+
+# --- Allow Fallthrough + COMPLETE: a disabled in-progress category must not
+# veto a Tier-XI vehicle's otherwise-finished skill tree (regression) ---------
+
+def _skill_done_rewards_in_progress(**kw):
+    # Tier-XI: skill tree fully upgraded, Elite Rewards still in progress, prestige
+    # data present so the ELITE grade-band candidate also applies.
+    d = dict(tier=11, is_elite=True, vehicle_xp=0, free_xp=0,
+             is_skill_tree=True, skilltree_done=26, skilltree_total=26,
+             skilltree_total_xp=325000,
+             has_prestige=True, elite_level=12, elite_max_level=20,
+             elite_grades=_grades(),
+             elite_rewards=[t.EliteReward(50, True), t.EliteReward(100, False)],
+             elite_level_xp={50: 500000, 100: 800000})
+    d.update(kw)
+    return t.VehicleSnapshot(**d)
+
+
+def test_fallthrough_complete_not_vetoed_by_disabled_in_progress_elite_categories():
+    # The bug: Elite Rewards AND Elite System both disabled while Elite Rewards is
+    # still in progress used to render nothing. With the fix, Allow Fallthrough
+    # excludes both disabled categories from the COMPLETE gate, so the finished
+    # skill tree alone is enough to show "Fully Progressed".
+    snap = _skill_done_rewards_in_progress()
+    enabled = {t.Mode.TECH_TREE, t.Mode.SKILL_TREE, t.Mode.FIELD_MODS}
+    m = build_model(snap, enabled, allow_fallthrough=True)
+    assert m.mode == t.Mode.COMPLETE
+    skill_rows = [u for u in m.avail_upgrades if u.category == t.Mode.SKILL_TREE]
+    assert len(skill_rows) == 1
+    assert skill_rows[0].done is True
+    assert t.Mode.ELITE_REWARDS not in [u.category for u in m.avail_upgrades]
+    assert t.Mode.ELITE not in [u.category for u in m.avail_upgrades]
+
+
+def test_fallthrough_false_leaves_the_same_scenario_hidden():
+    # Default path (Allow Fallthrough off) is unchanged: the priority winner
+    # (ELITE_REWARDS, still in progress) is disabled -> HIDDEN, no fall-through.
+    snap = _skill_done_rewards_in_progress()
+    enabled = {t.Mode.TECH_TREE, t.Mode.SKILL_TREE, t.Mode.FIELD_MODS}
+    m = build_model(snap, enabled, allow_fallthrough=False)
+    assert m.mode == t.Mode.HIDDEN
+
+
+def test_fallthrough_true_still_prefers_an_enabled_in_progress_elite_rewards_bar():
+    # With Elite Rewards left ON (still in progress), it wins over COMPLETE --
+    # the fix only excludes a DISABLED category from the gate, never an enabled one.
+    snap = _skill_done_rewards_in_progress()
+    enabled = _without(t.Mode.ELITE)
+    m = build_model(snap, enabled, allow_fallthrough=True)
+    assert m.mode == t.Mode.ELITE_REWARDS
     assert m.progress_current == 0
