@@ -1198,6 +1198,8 @@ function renderNextAvailable(nextEl, arr, nextArr, hotEl, spendableXp, est) {
     // stays inline to the right (existing horizontal shape, unchanged); the SECOND
     // renders in a column BELOW the parent, joined by a vertical connector
     // (.wg-chip-link-down), so the parent's own row position/spacing never shifts.
+    // Also reused, unchanged, by the 3-child fan-out below (fan3): that case wraps
+    // this same column with an inline chip on EACH side (left and right).
     function appendAvailColumn(idx, belowNu) {
         if (appended[idx]) return;
         appended[idx] = true;
@@ -1229,6 +1231,28 @@ function renderNextAvailable(nextEl, arr, nextArr, hotEl, spendableXp, est) {
     }
     for (let i = 0; i < availItems.length; i++) {
         const queue = insertAfter[i] || [];
+        // 3-child fan-out: ONE available parent with THREE locked "next" chips matched
+        // to it ALONE. Sketch:
+        //   C1 -- P -- C2
+        //         |
+        //         C3
+        // ponytail: 3-child fan-out only -- 4+ children still falls back to the
+        // generic inline chain / single-connector escape hatch below.
+        const fan3 = !appended[i] && queue.length === 3 &&
+            queue[0].kind === "single" && queue[1].kind === "single" && queue[2].kind === "single";
+        if (fan3) {
+            // Slot order is fitted to the observed in-client layout, NOT the Upgrades
+            // window's own reading order -- getNextStepIDs' queue order turned out to
+            // NOT match that reading order when checked live: queue[2] -> left,
+            // queue[0] -> below, queue[1] -> right. A different 3-child vehicle may
+            // need this re-checked in-client.
+            appendNext(queue[2].nu);              // left of the parent
+            appendLink();
+            appendAvailColumn(i, queue[0].nu);    // P + below chip (existing recipe)
+            appendLink();
+            appendNext(queue[1].nu);              // right of the parent
+            continue;
+        }
         const fanOut = !appended[i] && queue.length === 2 &&
             queue[0].kind === "single" && queue[1].kind === "single";
         if (fanOut) {
