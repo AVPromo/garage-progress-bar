@@ -24,6 +24,15 @@ ref by design (it carries only the client + dependency versions), so `check_vers
 scans nor requires one. At release time also bump `dist\INSTALL.txt` (the consumer-zip readme,
 step 3).
 
+**7th file that silently joins the list: `tests/test_compat_scrub_paths.py`.** It embeds the
+literal packaged filename `com.14th_ua.garageprogressbar_<old-version>.wotmod` as an example
+traceback path (added in commit de35a46), and `check_version.py` matches that pattern anywhere
+in the repo — so it treats the test's hardcoded example as a real version reference and fails
+if it's stale. This bit the 3.2.1 release (the test wasn't on the 6-file list above). Either
+bump the version in this test too, or apply the permanent fix: change its example path to a
+version-agnostic placeholder (a fake package name, not the real `com.14th_ua.garageprogressbar`
+string) so the scrub test stops tracking the release version.
+
 Then verify: `python build\check_version.py` (either Python) — fails on any reference that
 drifted from `src/meta.xml`. It matches five mod-version patterns (packaged filename, Setup
 filename, `MOD_VERSION`, `#define ModVersion`, prose `version <v>`), scans `dist\INSTALL.txt`
