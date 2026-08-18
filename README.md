@@ -44,6 +44,10 @@ upgrades without leaving the Garage. **Hover** any tick or icon for a tooltip.
 
 ![The bar showing the opt-in Potential Tier XI projection, with a tooltip](assets/img/en/potential-tier-xi.png)
 
+**Fully Progressed** — a golden bar once nothing is left to research, upgrade, or unlock, listing every finished progression type with its total XP cost:
+
+![The fully-progressed bar, with a tooltip](assets/img/en/fully-progressed.png)
+
 ## Compatibility
 
 | Requirement | Detail |
@@ -169,6 +173,10 @@ Building, deploying, testing, and the repo layout are documented in
 **Потенційний XI рівень** — опційна проекція для техніки X рівня без XI рівня: накопичений досвід відносно вартості відкриття (вимкнено за замовчуванням):
 
 ![Смуга з опційною проекцією Потенційного XI рівня та підказкою](assets/img/ua/potential-tier-xi.png)
+
+**Повністю пройдено** — золота смуга, коли вже нічого досліджувати, вдосконалювати чи відкривати:
+
+![Повністю пройдена смуга з підказкою](assets/img/ua/fully-progressed.png)
 
 ## Сумісність
 
