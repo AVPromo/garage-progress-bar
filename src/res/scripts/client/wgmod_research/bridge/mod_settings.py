@@ -566,6 +566,18 @@ def init():
             if old_raw:
                 try:
                     _apply(old_raw)
+                    # Carry-forward: the removed excludeEliteSystem (v<=13) maps to disabling
+                    # the Elite mode and letting the bar fall through past it -- the new
+                    # allowFallthrough. old_raw is the raw pre-bump dict (read straight off
+                    # api.state, not DEFAULTS-filtered), so it still carries the removed key
+                    # even though _apply above never touches it. Self-retiring: on a future
+                    # 14->N bump old_raw won't have excludeEliteSystem, so this is a no-op.
+                    if old_raw.get("excludeEliteSystem"):
+                        _settings["allowFallthrough"] = True
+                        _settings["showElite"] = False
+                        LOG_PROD(
+                            "[wgmod] carried excludeEliteSystem -> allowFallthrough "
+                            "+ showElite=False")
                     g_modsSettingsApi.updateModSettings(
                         LINKAGE, _full_settings_for_write(g_modsSettingsApi))
                     try:

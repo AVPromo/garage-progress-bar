@@ -169,6 +169,51 @@ def test_migration_preserves_host_enabled_false():
     assert api.state["settings"][M.LINKAGE]["enabled"] is False
 
 
+# --- excludeEliteSystem -> allowFallthrough/showElite carry-forward (v13->14) -----
+
+def test_migration_carries_exclude_elite_system_true_to_fallthrough_and_hides_elite():
+    # The removed v<=13 'excludeEliteSystem' maps onto the new allowFallthrough +
+    # showElite=False. showElite=True in old_raw proves the override runs AFTER _apply
+    # re-applies the stored value (otherwise showElite would stay True).
+    old = {"enabled": True, "excludeEliteSystem": True, "showElite": True,
+           "showWhenComplete": True}
+    api = _FakeMsaApi(stored=old, stored_version=13)
+    _run_init_with(api)
+    assert M._settings["allowFallthrough"] is True
+    assert M._settings["showElite"] is False
+    # Exactly one write, carrying the override into the persisted payload too.
+    assert api.updated == 1
+    assert api.saved == 1
+    written = api.state["settings"][M.LINKAGE]
+    assert written["allowFallthrough"] is True
+    assert written["showElite"] is False
+
+
+def test_migration_exclude_elite_system_false_is_noop():
+    # excludeEliteSystem=False -> the carry-forward branch never fires: allowFallthrough
+    # stays at its default, showElite keeps whatever old_raw supplied.
+    old = {"enabled": True, "excludeEliteSystem": False, "showElite": True,
+           "showWhenComplete": True}
+    api = _FakeMsaApi(stored=old, stored_version=13)
+    _run_init_with(api)
+    assert M._settings["allowFallthrough"] is False
+    assert M._settings["showElite"] is True
+    assert api.updated == 1
+    assert api.saved == 1
+
+
+def test_migration_exclude_elite_system_absent_is_noop():
+    # No 'excludeEliteSystem' key at all (e.g. a much-older stored dict) -> old_raw.get(...)
+    # returns None/falsy, no KeyError, and both settings land at their fresh defaults.
+    old = {"enabled": True, "showWhenComplete": True}
+    api = _FakeMsaApi(stored=old, stored_version=13)
+    _run_init_with(api)
+    assert M._settings["allowFallthrough"] is False
+    assert M._settings["showElite"] == M.DEFAULTS["showElite"]
+    assert api.updated == 1
+    assert api.saved == 1
+
+
 # --- fresh install ----------------------------------------------------------
 
 def test_fresh_install_yields_defaults_without_spurious_persist():

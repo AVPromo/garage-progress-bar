@@ -146,6 +146,26 @@ tank now shows Fully Progressed instead of the Elite bar.)
   `settings_i18n.label()` — never a second translation table.
 - Render side (golden gradient, `done_big.png`, the `.wg-chip` category row, the `FORCE_COMPLETE`
   dev flag): gpb-widget → "COMPLETE".
+- **"Allow Fallthrough" (`allowFallthrough`, default off) replaced "Exclude Elite System".**
+  It changes TWO things in `build_model`, both gated on the same flag:
+  - The COMPLETE gate is normally **toggle-BLIND**: `complete.resolve(snapshot, enabled=...)`
+    (`domain/builder.py:408`, gate at `:413` -- `done_cats and Mode.POTENTIAL_TIER_XI not in
+    by_mode`) receives `enabled=None` by default, and `complete.resolve` (`resolvers/complete.py:86`)
+    returns `[]` unless EVERY *applicable* category is done -- so a category still in progress
+    (e.g. Elite Rewards) vetoes Fully Progressed for the whole vehicle even if the player
+    disabled that mode's bar. Under Allow Fallthrough, `build_model` passes the real `enabled`
+    set instead: `complete.py:100` then skips a disabled-mode category from BOTH the all-done
+    check and the returned list, so a disabled-but-unfinished category no longer vetoes -- only
+    the enabled, completed categories show. `enabled=None` (flag off) is byte-identical to
+    before.
+  - The final resolution branch (`builder.py:420-423`) stops hiding a disabled top-priority
+    winner: instead of `_placeholder(Mode.HIDDEN)`, it takes the next enabled candidate in
+    priority order -- `by_mode[avail[0]] if avail else HIDDEN` (`avail` is already the
+    priority-ordered enabled subset of `cands`, so no rescan is needed).
+  - The membership test in `complete.py` is inlined rather than importing `builder._on` --
+    importing it would be circular (`builder` imports `complete`).
+  - settingsVersion bumped 13->14 for the varName swap. Shipped + deployed on client 2.3.1.2,
+    feature verified in-client 2026-08-18.
 
 ## Conventions specific to this mod
 - **A GATE resolver must fail CLOSED — the repo-wide fail-soft rule INVERTS into a bug here.**
