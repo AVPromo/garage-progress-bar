@@ -338,6 +338,19 @@ render behavior, not a plan.
   `align-items:flex-start` (not `center`) plus a compensating `margin-top:14rem` (Large
   `21rem`) on the thin horizontal `.wg-chip-link` so its row still sits on the same centerline
   as the rest of the fan-out.
+- **Fan-out ceiling raised to 3 (`fan3`, commit 094ac7d, visually confirmed in-client) — a
+  T-branch.** One available parent with THREE locked successors: two render inline either side
+  of the parent (left/right `.wg-chip-link`s) and the third below via `.wg-chip-col`/
+  `.wg-chip-link-down`, reusing `appendAvailColumn` for the parent+below cell — no new CSS.
+  Fires only when `queue.length === 3`, every entry is `kind === "single"`, and the parent slot
+  is free (`!appended[i]`), mirroring the 2-child `fanOut` guard; 4+ children or any tangled/
+  shared-parent case still falls back to the single-connector escape hatch.
+  **Gotcha (unresolved, re-check per vehicle):** the resolver's `getNextStepIDs` queue order
+  does NOT match the Upgrades window's above→right→below reading order. `fan3`'s slot mapping
+  (`queue[2]`→left, `queue[0]`→below, `queue[1]`→right) was FITTED to one vehicle's observed
+  in-client layout, not derived from a stable key — no known sort key reproduces the window's
+  order from resolver data. A different 3-child vehicle may render its three children in the
+  wrong slots; verify in-client before trusting a new one.
 - **`.wg-hot` coverage assumption — below-node content needs its own hover hookup.** The single
   transparent hit-test overlay (`pointer-events:auto`, hit-tests chips via a live
   `getBoundingClientRect`) only extends ~`39rem` below the bar, sized for ONE horizontal chip
