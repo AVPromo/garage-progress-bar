@@ -105,7 +105,14 @@ def _compile_tree(src_root, out_root):
             src_file = os.path.join(dirpath, name)
             if name.endswith(".py"):
                 pyc = os.path.join(target_dir, name + "c")  # foo.py -> foo.pyc
-                py_compile.compile(src_file, cfile=pyc, doraise=True)
+                # dfile: bake a source-root-relative path (forward slashes) into
+                # co_filename instead of the absolute src_file, so shipped .pyc
+                # tracebacks/logs never leak the dev machine's path/username.
+                # Prefixed with "res/" to mirror the .wotmod's internal archive
+                # layout (res/scripts/client/...), matching what LOG_CURRENT_EXCEPTION's
+                # scrub anchors on.
+                dfile = "res/" + os.path.relpath(src_file, src_root).replace("\\", "/")
+                py_compile.compile(src_file, cfile=pyc, dfile=dfile, doraise=True)
             elif name.endswith(".pyc"):
                 continue  # skip stray/foreign bytecode; we compile fresh from .py
             else:
