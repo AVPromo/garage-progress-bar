@@ -15,7 +15,7 @@ skill is the concrete wiring for the Garage Progress Bar.
 & "C:\Python27\python.exe" build/build_wotmod.py
 
 # Clean-build-and-deploy into a local install (Py 2.7, CLIENT CLOSED — file locks)
-& "C:\Python27\python.exe" build/deploy_wotmod.py "D:/Games/World_of_Tanks_EU" 2.3.1.2
+& "C:\Python27\python.exe" build/deploy_wotmod.py "D:/Games/World_of_Tanks_EU" 2.3.1.3
 & "C:\Python27\python.exe" build/deploy_wotmod.py          # uses deploy.local.json (gitignored)
 
 # Domain-layer tests (Py 3.13) — engine-free, no game needed
@@ -23,12 +23,18 @@ skill is the concrete wiring for the Garage Progress Bar.
 & "<py3>" -m pytest tests/test_resolver_techtree.py -q     # single file
 
 # Hot-reload JS/CSS ONLY, no relaunch (Py 3.13) — then switch screens in-game to refresh
-& "<py3>" tools/dev/sync_gameface.py "D:/Games/World_of_Tanks_EU" 2.3.1.2
+& "<py3>" tools/dev/sync_gameface.py "D:/Games/World_of_Tanks_EU" 2.3.1.3
 ```
 `<py3>` = `%LOCALAPPDATA%\Programs\Python\Python313\python.exe`.
 
 ## This mod's specifics
 - **Package:** `dist/com.14th_ua.garageprogressbar_<version>.wotmod`. Build with Py 2.7 ONLY.
+- **`py_compile.compile` needs a scrubbed `dfile`, or shipped `.pyc` leak the dev's machine.**
+  `build_wotmod.py` must pass `dfile = "res/" + os.path.relpath(src_file, src_root).replace("\\", "/")`
+  — the `res/` prefix mirrors the `.wotmod`'s internal layout. Left at the default, `co_filename`
+  bakes the dev's ABSOLUTE source path + Windows username into every compiled module, and the
+  game's native logger prints it on every python.log line for every player who hits a traceback
+  (fixed in v3.3.1, GitHub #10, commit `636fb9f`).
 - **The packaged build is size-optimized (behaviour/UI unchanged).** `build_wotmod.py`
   self-re-execs under `-OO` (strips `.pyc` docstrings) and minifies `WGModResearch.js`/`.css`
   through the vendored `build/vendor/rjsmin.py` / `rcssmin.py` (comment + whitespace only,
@@ -49,11 +55,11 @@ skill is the concrete wiring for the Garage Progress Bar.
   to land the exact tested/published artifact (e.g. a QA-gate + deploy of the released
   v1.3.0 `.wotmod`), copy the precise
   `dist\com.14th_ua.garageprogressbar_<ver>.wotmod` by hand into `mods\<client-version>\`
-  (e.g. `mods\2.3.1.2\`) with the CLIENT CLOSED — a running client locks the stale
+  (e.g. `mods\2.3.1.3\`) with the CLIENT CLOSED — a running client locks the stale
   `..._<oldver>.wotmod` (`Device or resource busy` on delete), so the old-copy cleanup can't
   finish while it's open. (Same-`<id>` highest-version-wins and scan-only-at-launch mechanics:
   see **wotmod-build-deploy**.) Reserve `deploy_wotmod.py` for the normal build-and-deploy loop.
-- **Target:** EU/global `2.3.1.2` only (the current `deploy.local.json` client version — the
+- **Target:** EU/global `2.3.1.3` only (the current `deploy.local.json` client version — the
   literal above is only an example; a client bump is run via **wotmod-upgrade-analyzer** /
   **wotmod-upgrade-implementer**, not hand-edited here).
 - **Dependencies (same `mods/<version>/`):** OpenWG GameFace is a **hard** dependency; the
