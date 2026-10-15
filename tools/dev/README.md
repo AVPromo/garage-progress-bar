@@ -15,7 +15,7 @@ Loose `res_mods\<version>\scripts` does **not** load in 2.3, and `res_mods` outr
 ```
 # 1) close the WoT client (file locks); then build+deploy the real mod:
 & "C:\Python27\python.exe" build\deploy_wotmod.py "D:\Games\World_of_Tanks_EU" 2.4.1.0
-# 2) relaunch the client. (OpenWG may auto-restart once when res_map changes.)
+# 2) relaunch the client.
 ```
 `deploy_wotmod.py` auto-cleans old `com.14th_ua.garageprogressbar_[0-9]*.wotmod` and loose leftovers.
 
