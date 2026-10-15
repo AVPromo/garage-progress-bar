@@ -81,4 +81,5 @@ $sha = [System.Security.Cryptography.SHA256]::Create()
 $fs = [System.IO.File]::OpenRead($out.FullName)
 try { $hash = ([BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-', '').ToLower() } finally { $fs.Dispose() }
 [System.IO.File]::WriteAllText("$($out.FullName).sha256", $hash)
+if (-not (Test-Path "$($out.FullName).sha256")) { throw "SHA-256 sidecar was not written: $($out.FullName).sha256" }
 Write-Host "Wrote $($out.Name).sha256 ($hash)"
