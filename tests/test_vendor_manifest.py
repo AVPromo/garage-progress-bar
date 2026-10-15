@@ -59,3 +59,12 @@ def test_manifest_entries_have_origin_and_licence():
     incomplete = [name for name, entry in manifest.items()
                   if not entry.get("origin") or not entry.get("licence")]
     assert not incomplete, "manifest.json entries missing origin/licence: %s" % incomplete
+
+
+def test_mit_vendor_entries_ship_their_licence_file():
+    manifest = _manifest()
+    missing = [name for name, entry in manifest.items()
+               if entry.get("licence", "").startswith("MIT")
+               and not os.path.isfile(os.path.join(
+                   ROOT, "installer", "licenses", entry.get("licence_file", "<unset>")))]
+    assert not missing, "MIT vendor entries without installer/licenses/<licence_file>: %s" % missing
