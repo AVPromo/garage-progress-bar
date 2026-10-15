@@ -21,10 +21,10 @@ $ErrorActionPreference = 'Stop'
 $InstallerDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot     = Split-Path -Parent $InstallerDir
 $Iss          = Join-Path $InstallerDir 'wgmod-setup.iss'
-$ModWotmod    = Join-Path $RepoRoot 'dist\com.14th_ua.garageprogressbar_7.0.0.wotmod'
-$OpenWg       = Join-Path $InstallerDir 'vendor\net.openwg.gameface_1.1.6.wotmod'
-$Msa          = Join-Path $InstallerDir 'vendor\aslain.modmenu_2.0.16.wotmod'
-$ModsList     = Join-Path $InstallerDir 'vendor\me.poliroid.modslistapi_1.7.9.wotmod'
+$ModWotmod    = Join-Path $RepoRoot 'dist\com.14th_ua.garageprogressbar_8.0.0.wotmod'
+$OpenWg       = Join-Path $InstallerDir 'vendor\net.openwg.gameface_1.2.2.wotmod'
+$Msa          = Join-Path $InstallerDir 'vendor\aslain.modmenu_2.1.04.wotmod'
+$ModsList     = Join-Path $InstallerDir 'vendor\me.poliroid.modslistapi_1.8.0.wotmod'
 
 function Find-ISCC {
     $candidates = @(
@@ -74,3 +74,11 @@ $out = Get-ChildItem (Join-Path $RepoRoot 'dist') -Filter 'GarageProgressBar-Set
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Write-Host ''
 Write-Host "Built installer: $($out.FullName)" -ForegroundColor Green
+
+# <exe>.sha256 sidecar (bare hex): the installer's self-updater refuses to run a download
+# without it. .NET hash -- Get-FileHash is unavailable under `powershell -NoProfile` here.
+$sha = [System.Security.Cryptography.SHA256]::Create()
+$fs = [System.IO.File]::OpenRead($out.FullName)
+try { $hash = ([BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-', '').ToLower() } finally { $fs.Dispose() }
+[System.IO.File]::WriteAllText("$($out.FullName).sha256", $hash)
+Write-Host "Wrote $($out.Name).sha256 ($hash)"
