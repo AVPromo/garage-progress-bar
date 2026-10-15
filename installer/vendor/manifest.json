@@ -6,13 +6,14 @@
     "sha256": "674f95cf3526e646cea64be55767a9bfe51b19b109326e8c4132881a7a76a5b4"
   },
   "me.poliroid.modslistapi_1.8.0.wotmod": {
-    "origin": "ModsList (https://gitlab.com/Poliroid/modslistapi)",
+    "origin": "ModsList (https://gitlab.com/wot-public-mods/mods-list)",
     "licence": "unknown -- redistributed as-is, same as it ships in community modpacks",
     "sha256": "c6e4a1d9476b0195c3b4fab392cf5d68c00f1d02fd79e29bd7424ebda88b498c"
   },
   "net.openwg.gameface_1.2.2.wotmod": {
     "origin": "OpenWG GameFace (https://gitlab.com/openwg/wot.gameface)",
-    "licence": "open source, routinely redistributed in WoT mod packs",
+    "licence": "MIT",
+    "licence_file": "openwg-gameface-LICENSE.txt",
     "sha256": "2bb65f28663e3ab34b5a1102a1bbd1f6e17a65e1f6a898a8645c4ab732b50184"
   }
 }
