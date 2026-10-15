@@ -17,7 +17,7 @@ switch vehicles.
 
 | Requirement | Detail |
 |-------------|--------|
-| **Game** | World of Tanks **EU (Wargaming)** client, version **2.4.1.0**. Built and tested against this version. |
+| **Game** | World of Tanks **EU (Wargaming)** client, version **2.4.1.0**. Built for World of Tanks 2.4.1.0. |
 | **Dependency** | **OpenWG GameFace** (required). The installer sets this up for you; for a manual install you add it yourself. |
 | **Optional** | **Aslain ModMenu** — adds the mod's options to its in-game Modification list window. The installer adds it if missing; without it the bar simply shows everywhere with no options. |
 

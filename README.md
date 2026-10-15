@@ -52,7 +52,7 @@ upgrades without leaving the Garage. **Hover** any tick or icon for a tooltip.
 
 | Requirement | Detail |
 |-------------|--------|
-| **Game** | World of Tanks **EU 2.4.1.0** (Wargaming global client). Built and tested against this version. |
+| **Game** | World of Tanks **EU 2.4.1.0** (Wargaming global client). Built for World of Tanks 2.4.1.0. |
 | **Required** | **OpenWG GameFace** 1.2.2+ — install it first, or the bar will not appear. From [wgmods.net](https://wgmods.net) or [gitlab.com/openwg/wot.gameface](https://gitlab.com/openwg/wot.gameface). |
 | **Optional** | **Aslain ModMenu** + **ModsList** — add the mod's options to the in-game "Modification list" window. The installer bundles both; without them the bar simply shows everywhere with no toggles. Most modpacks already include them. |
 
